@@ -1,0 +1,13 @@
+[project]
+name = "network-public-opinion-analyze"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.2",
+    "pyarrow>=24.0.0",
+    "xlrd>=2.0.2",
+    "zhconv>=1.4.3",
+]

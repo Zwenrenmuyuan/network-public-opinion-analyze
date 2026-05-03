@@ -1,0 +1,11 @@
+# PyTorch 单独装，参考 https://pytorch.org/get-started/locally/
+# torch>=2.0
+# torchvision
+# torchaudio
+
+transformers>=4.30
+pandas>=2.0
+scikit-learn>=1.3
+tqdm>=4.65
+zhconv>=1.4
+openpyxl>=3.1   # 读 SMP2020 的 xlsx 测试集

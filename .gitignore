@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# 数据：体积大且都能从原始 zip 重新生成
+data/raw/
+data/processed/
+
+# 训练产物（未来会有）
+**/saved_models/
+**/checkpoints/
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Mac
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
