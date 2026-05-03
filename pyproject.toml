@@ -1,18 +1,29 @@
 [project]
 name = "network-public-opinion-analyze"
 version = "0.1.0"
-description = "Add your description here"
+description = "中文社交媒体短文本 6 分类情感分析（基于 SMP2020-EWECT 数据集）"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=3.0.2",
     "pyarrow>=24.0.0",
+    "scikit-learn>=1.8.0",
     "torch>=2.4",
     "torchvision>=0.19",
+    "transformers>=5.7.0",
     "xlrd>=2.0.2",
     "zhconv>=1.4.3",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# 把 src/npo 作为可装的包，让 scripts/ 里所有入口都用 `from npo.xxx import ...`，
+# 避免 legacy 时代的 sys.path hack。`uv sync` 会自动 editable 安装。
+[tool.hatch.build.targets.wheel]
+packages = ["src/npo"]
 
 # Windows 用 PyTorch 官方 CUDA 12.8 wheel，Mac 用 PyPI 上自带 MPS 的版本。
 # 两台机器跑同一份 `uv sync` 即可装到对应平台的版本。

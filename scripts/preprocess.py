@@ -36,6 +36,7 @@ import pandas as pd
 from zhconv import convert
 
 from dataset_paths import DEFAULT_RAW_ROOT, labeled_files
+from npo.config import LABEL2ID, LABEL_MAP_EN_TO_ZH
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT_ROOT = ROOT / 'data' / 'processed'
@@ -44,17 +45,6 @@ DEFAULT_OUT_ROOT = ROOT / 'data' / 'processed'
 # 截到 512 是为了防御性地兜底，不影响 BERT 训练（BERT 原生 max=512）。
 # 训练时由 tokenizer 决定真正的 max_length。
 SANITY_MAX_CHARS = 512
-
-LABEL_MAP_EN_TO_ZH = {
-    'happy':    '积极',
-    'angry':    '愤怒',
-    'sad':      '悲伤',
-    'fear':     '恐惧',
-    'surprise': '惊讶',
-    'neutral':  '中性',
-}
-LABELS_ZH = ('积极', '愤怒', '悲伤', '恐惧', '惊讶', '中性')
-LABEL2ID = {lab: i for i, lab in enumerate(LABELS_ZH)}
 
 # 清洗正则
 _URL_RE       = re.compile(r'http[s]?://\S+')

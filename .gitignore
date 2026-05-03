@@ -13,9 +13,10 @@ wheels/
 data/raw/
 data/processed/
 
-# 训练产物（未来会有）
+# 训练产物
 **/saved_models/
 **/checkpoints/
+runs/
 *.bin
 *.safetensors
 *.pt
