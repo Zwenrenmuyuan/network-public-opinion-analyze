@@ -12,6 +12,9 @@ wheels/
 # 数据：体积大且都能从原始 zip 重新生成
 data/raw/
 data/processed/
+data/processed_*/
+data/annotation/
+data/business/
 
 # 训练产物
 **/saved_models/
