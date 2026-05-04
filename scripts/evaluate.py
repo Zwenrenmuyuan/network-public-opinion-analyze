@@ -46,8 +46,8 @@ def parse_args() -> argparse.Namespace:
                    help='HF checkpoint 目录（含 config.json + safetensors + tokenizer files）')
     p.add_argument('--track', choices=['usual', 'virus'], required=True)
     p.add_argument('--processed-root', type=Path, default=DEFAULT_PROCESSED_ROOT)
-    p.add_argument('--split', choices=['eval', 'test'], default='test',
-                   help='评估哪个 split。默认 test (final 评估)')
+    p.add_argument('--split', default='test',
+                   help='评估哪个 split。默认 test；也可传 business_eval 等自定义 split')
     p.add_argument('--max-length', type=int, default=None)
     p.add_argument('--batch-size', type=int, default=32)
     p.add_argument('--num-workers', type=int, default=0)

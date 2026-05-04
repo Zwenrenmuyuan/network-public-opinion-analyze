@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv/
 
+# Local secrets
+.env
+.env.local
+
 # 数据：体积大且都能从原始 zip 重新生成
 data/raw/
 data/processed/
@@ -20,6 +24,7 @@ data/business/
 **/saved_models/
 **/checkpoints/
 runs/
+artifacts/
 *.bin
 *.safetensors
 *.pt

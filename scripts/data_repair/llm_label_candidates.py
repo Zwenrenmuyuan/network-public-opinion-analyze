@@ -12,17 +12,42 @@ import json
 import os
 import random
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pandas as pd
 
+SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCRIPTS_DIR))
+from dataset_paths import ROOT  # noqa: E402
 from npo.config import LABELS_ZH
 
-ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_GUIDELINE = ROOT / 'docs' / 'labeling-guideline.md'
 ALLOWED_LABELS = set(LABELS_ZH)
+PASSTHROUGH_COLUMNS = (
+    'source_id', 'raw_text', 'post_id', 'created_at', 'like_count',
+    'region_name', 'has_images', 'has_video', 'priority', 'candidate_rank',
+)
+
+
+def load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('export '):
+            line = line[len('export '):].strip()
+        if '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip().strip('"\'')
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,6 +174,25 @@ def validate_label_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def json_safe(value: Any) -> Any:
+    if value is None:
+        return ''
+    try:
+        if pd.isna(value):
+            return ''
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+    return str(value)
+
+
+def passthrough_fields(row: dict[str, Any]) -> dict[str, Any]:
+    return {col: json_safe(row[col]) for col in PASSTHROUGH_COLUMNS if col in row}
+
+
 async def call_llm(
     client: httpx.AsyncClient,
     url: str,
@@ -210,6 +254,7 @@ async def label_one(
                 'llm_reason': parsed['reason'],
                 'needs_human_review': parsed['needs_human_review'],
                 'model': args.model,
+                **passthrough_fields(row),
             }, None
         except Exception as exc:  # noqa: BLE001 - CLI 要把失败样本落盘
             last_error = repr(exc)
@@ -284,6 +329,7 @@ async def run(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    load_env_file(ROOT / '.env')
     asyncio.run(run(parse_args()))
 
 
