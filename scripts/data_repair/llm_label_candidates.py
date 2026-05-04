@@ -26,6 +26,53 @@ from npo.config import LABELS_ZH
 
 DEFAULT_GUIDELINE = ROOT / 'docs' / 'labeling-guideline.md'
 ALLOWED_LABELS = set(LABELS_ZH)
+LABEL_ALIASES = {
+    '快乐': '积极',
+    '开心': '积极',
+    '高兴': '积极',
+    '喜悦': '积极',
+    '喜欢': '积极',
+    '支持': '积极',
+    '赞赏': '积极',
+    '欣慰': '积极',
+    '感动': '积极',
+    '生气': '愤怒',
+    '气愤': '愤怒',
+    '愤慨': '愤怒',
+    '不满': '愤怒',
+    '抱怨': '愤怒',
+    '责备': '愤怒',
+    '厌恶': '愤怒',
+    '反感': '愤怒',
+    '吐槽': '愤怒',
+    '失望': '悲伤',
+    '难过': '悲伤',
+    '伤心': '悲伤',
+    '沮丧': '悲伤',
+    '遗憾': '悲伤',
+    '心疼': '悲伤',
+    '委屈': '悲伤',
+    '哀伤': '悲伤',
+    '害怕': '恐惧',
+    '担心': '恐惧',
+    '焦虑': '恐惧',
+    '忧虑': '恐惧',
+    '惊恐': '恐惧',
+    '恐慌': '恐惧',
+    '紧张': '恐惧',
+    '震惊': '惊讶',
+    '惊奇': '惊讶',
+    '意外': '惊讶',
+    '吃惊': '惊讶',
+    '惊喜': '惊讶',
+    '无': '中性',
+    '无明显情感': '中性',
+    '客观': '中性',
+    '平静': '中性',
+    '陈述': '中性',
+    '无情绪': '中性',
+    '中立': '中性',
+}
 PASSTHROUGH_COLUMNS = (
     'source_id', 'raw_text', 'post_id', 'created_at', 'like_count',
     'region_name', 'has_images', 'has_video', 'priority', 'candidate_rank',
@@ -127,7 +174,8 @@ def build_user_prompt(row: dict[str, Any], text_column: str) -> str:
     text = str(row[text_column])
     return (
         '请标注以下文本的主导情感。\n'
-        '只能从：积极、愤怒、悲伤、恐惧、惊讶、中性 中选择。\n'
+        'label 和 second_label 都只能从：积极、愤怒、悲伤、恐惧、惊讶、中性 中选择；'
+        '如果没有明确 second_label，请返回空字符串，不要返回“失望/不满/厌恶”等细分词。\n'
         '返回字段必须包含 label, second_label, confidence, reason, needs_human_review。\n\n'
         f'样本上下文：{json.dumps(context, ensure_ascii=False)}\n'
         f'文本：{text}'
@@ -148,13 +196,24 @@ def extract_json_object(text: str) -> dict[str, Any]:
         return json.loads(match.group(0))
 
 
+def normalize_label(value: Any, field_name: str, allow_empty: bool = False) -> str:
+    label = str(value or '').strip()
+    if not label:
+        if allow_empty:
+            return ''
+        raise ValueError(f'缺少 {field_name}')
+    if label in ALLOWED_LABELS:
+        return label
+    if label in LABEL_ALIASES:
+        return LABEL_ALIASES[label]
+    if allow_empty:
+        return ''
+    raise ValueError(f'非法 {field_name}: {label!r}')
+
+
 def validate_label_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    label = str(payload.get('label', '')).strip()
-    second = str(payload.get('second_label', '') or '').strip()
-    if label not in ALLOWED_LABELS:
-        raise ValueError(f'非法 label: {label!r}')
-    if second and second not in ALLOWED_LABELS:
-        raise ValueError(f'非法 second_label: {second!r}')
+    label = normalize_label(payload.get('label'), 'label')
+    second = normalize_label(payload.get('second_label'), 'second_label', allow_empty=True)
     confidence = float(payload.get('confidence', 0))
     if not 0 <= confidence <= 1:
         raise ValueError(f'confidence 必须在 0-1: {confidence!r}')
