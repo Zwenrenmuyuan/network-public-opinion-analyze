@@ -27,6 +27,15 @@ def write_jsonl(df: pd.DataFrame, path: Path) -> None:
             f.write(json.dumps(row, ensure_ascii=False, default=str) + '\n')
 
 
+def make_parquet_safe(df: pd.DataFrame) -> pd.DataFrame:
+    """避免 object 列混合数字和空字符串导致 pyarrow 推断失败。"""
+    out = df.copy()
+    for col in out.columns:
+        if out[col].dtype == 'object':
+            out[col] = out[col].map(lambda x: None if pd.isna(x) else str(x))
+    return out
+
+
 def add_common_args(p: argparse.ArgumentParser) -> None:
     p.add_argument('--primary', type=Path, required=True,
                    help='第一阶段 LLM JSONL，通常来自 mimo-v2-flash')
@@ -96,7 +105,7 @@ def prepare_review(args: argparse.Namespace) -> None:
     )
     review = primary[mask].copy()
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    review.to_parquet(args.out, index=False)
+    make_parquet_safe(review).to_parquet(args.out, index=False)
     print(f'写出 {args.out}: {len(review)} 条复核输入')
 
 

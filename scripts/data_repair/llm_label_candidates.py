@@ -235,10 +235,10 @@ def validate_label_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 def json_safe(value: Any) -> Any:
     if value is None:
-        return ''
+        return None
     try:
         if pd.isna(value):
-            return ''
+            return None
     except (TypeError, ValueError):
         pass
     if isinstance(value, (str, int, float, bool)):
