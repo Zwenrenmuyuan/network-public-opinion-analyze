@@ -40,6 +40,31 @@
 
 在相同的 `processed_mixed_v2` 数据上，ERNIE 在业务验证集和 SMP test 上均优于 BERT。BERT 不适合作为最终主模型，但可作为对照模型和分歧样本发现工具。
 
+业务验证集逐样本分歧分析显示，两模型预测一致 1223 条（一致率 81.53%），预测不一致 277 条（一致外样本占 18.47%）。其中 ERNIE 单独预测正确 156 条，BERT 单独预测正确 75 条，二者都错误 186 条；若采用“任一模型预测正确即视为可召回”的 oracle 口径，accuracy 可达 0.8760。该结果说明 BERT 虽不适合作为主模型，但仍能补充召回一部分 ERNIE 错误样本，适合用于困难样本挖掘与后续主动学习。
+
+| 指标 | 数值 |
+|---|---:|
+| agreement | 1223 (81.53%) |
+| disagreement | 277 (18.47%) |
+| both correct | 1083 |
+| ERNIE only correct | 156 |
+| BERT only correct | 75 |
+| both wrong | 186 |
+| oracle accuracy | 0.8760 |
+| disagreement ERNIE accuracy | 0.5632 |
+| disagreement BERT accuracy | 0.2708 |
+
+BERT 单独预测正确样本的真实标签分布如下：
+
+| 标签 | 数量 |
+|---|---:|
+| 积极 | 17 |
+| 愤怒 | 13 |
+| 悲伤 | 9 |
+| 恐惧 | 2 |
+| 惊讶 | 10 |
+| 中性 | 24 |
+
 论文中可表述为：
 
 > 本文构建了 BERT 与 ERNIE 双模型对照实验框架，并利用双模型预测差异辅助发现困难样本。实验结果表明，ERNIE 在业务验证集和通用测试集上均取得更优表现，因此最终选取 ERNIE mixed-v2 作为主模型，保留 BERT 作为对照模型和困难样本分析工具。
