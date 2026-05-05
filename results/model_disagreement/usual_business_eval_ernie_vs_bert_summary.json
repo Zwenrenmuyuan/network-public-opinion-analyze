@@ -1,0 +1,30 @@
+{
+  "samples": 1500,
+  "ernie": {
+    "accuracy": 0.826,
+    "macro_f1": 0.7738115031897088
+  },
+  "bert": {
+    "accuracy": 0.772,
+    "macro_f1": 0.7165055697313495
+  },
+  "agreement_count": 1223,
+  "agreement_rate": 0.8153333333333334,
+  "disagreement_count": 277,
+  "disagreement_rate": 0.18466666666666667,
+  "both_correct": 1083,
+  "ernie_only_correct": 156,
+  "bert_only_correct": 75,
+  "both_wrong": 186,
+  "oracle_accuracy": 0.876,
+  "disagreement_primary_accuracy": 0.5631768953068592,
+  "disagreement_secondary_accuracy": 0.27075812274368233,
+  "secondary_only_by_label": {
+    "积极": 17,
+    "愤怒": 13,
+    "悲伤": 9,
+    "恐惧": 2,
+    "惊讶": 10,
+    "中性": 24
+  }
+}
