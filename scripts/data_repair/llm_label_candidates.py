@@ -76,6 +76,9 @@ LABEL_ALIASES = {
 PASSTHROUGH_COLUMNS = (
     'source_id', 'raw_text', 'post_id', 'created_at', 'like_count',
     'region_name', 'has_images', 'has_video', 'priority', 'candidate_rank',
+    'target_bucket', 'target_buckets', 'matched_keywords', 'selection_flags',
+    'selection_score', 'model_pred', 'model_top1_prob', 'model_top2_label',
+    'model_top2_prob', 'model_margin', 'target_max_prob', 'model_target_match',
 )
 
 

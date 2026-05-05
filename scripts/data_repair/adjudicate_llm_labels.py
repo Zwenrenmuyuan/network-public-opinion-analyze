@@ -141,7 +141,10 @@ def adjudicate(args: argparse.Namespace) -> None:
     preferred = [
         'sample_id', 'source', 'track', 'split', 'content', 'current_label', 'raw_labels',
         'source_id', 'raw_text', 'post_id', 'created_at', 'like_count', 'region_name',
-        'has_images', 'has_video', 'priority', 'candidate_rank',
+        'has_images', 'has_video', 'priority', 'candidate_rank', 'target_bucket',
+        'target_buckets', 'matched_keywords', 'selection_flags', 'selection_score',
+        'model_pred', 'model_top1_prob', 'model_top2_label', 'model_top2_prob',
+        'model_margin', 'target_max_prob', 'model_target_match',
         'primary_label', 'primary_second_label', 'primary_confidence', 'primary_reason',
         'review_label', 'review_second_label', 'review_confidence', 'review_reason',
         'primary_review_agree', 'adjudicated_label', 'adjudication_status',
