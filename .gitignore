@@ -30,6 +30,9 @@ artifacts/
 *.pt
 *.ckpt
 
+# 分歧明细含业务原文，仅本地分析使用
+results/model_disagreement/*_details.csv
+
 # Jupyter
 .ipynb_checkpoints/
 

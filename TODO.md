@@ -27,42 +27,46 @@
   - 3060 上 BERT-usual 0.7412 vs Mac 0.7331 → +0.008，硬件 / 精度差异在合理范围
   - usual 顽疾：愤怒↔悲伤（BERT 212+74=286 条 / ERNIE 224+59=283 条，换模型没缓解）
   - virus 顽疾：积极↔中性 / 积极↔悲伤（数据 51% 是积极，模型偏向积极）
-
-## 当前
-
 - ✅ ~~ERNIE × virus 重跑 `--epochs 8`~~（2026-05-03 已验证：**假设否定**）
   - 新 run `ernie-virus-20260504-0252` test macro_f1 = 0.6619（vs 旧 5 epoch 的 0.6623，几乎打平）
   - 新 run 早停在 epoch 8，best @ epoch 6 = 0.6485（eval set，比旧 5-epoch 的 0.6587 还低 0.01）
-  - **真正原因**：trainer 用 `linear_schedule_with_warmup(num_training_steps=len(loader)*epochs)`，
-    epoch 上限改大同时把 lr 衰减曲线拉长，原本"最后一 epoch lr→0 做精修"的效果被打散
+  - epoch 上限改大没有收益，且更容易过拟合；不继续把 lr schedule 当主线优化方向
   - train_loss 从 0.55→0.30，eval_loss 从 0.95→1.16，新 run 实际**更过拟合**
-  - 结论：**不是 epoch 上限问题，是 lr schedule + virus 数据规模导致的最佳点恰好落在 epoch 5**
   - `compare_runs.py` 改成 `--pick best/latest` 双策略，默认 best，保留两次 run 让对比表自动用更强的
+
+## 当前
+
+- **主线收敛到通用舆情模型：`ernie` + `usual`**。
+  - 线上/业务默认不使用 `virus` 训练模型；疫情语料和当前场景不适配，容易引入 domain bias。
+  - `virus` 结果保留为专项场景参考，不再围绕 `virus` 做调参、采样或合训实验。
+- **六分类效果优化先走数据治理，不继续优先调参**。
+  - ✅ 六分类 LLM/人工统一标注规范：`docs/labeling-guideline.md`
+  - ✅ SMP 高风险重标候选生成：`scripts/data_repair/build_smp_relabel_candidates.py`
+  - ✅ 业务离线 Parquet 候选生成：`scripts/data_repair/build_business_label_candidates.py`
+  - ✅ OpenAI-compatible LLM 并发预标注：`scripts/data_repair/llm_label_candidates.py`
+  - ✅ 两级 LLM 复核 / 自动仲裁：`scripts/data_repair/adjudicate_llm_labels.py`
+  - ✅ Silver 派生训练集生成：`scripts/data_repair/build_smp_silver_dataset.py`
+  - [ ] 跑一批 `usual` 重标候选，人工抽查 LLM 标注质量
+  - [ ] 从爬虫 ClickHouse 离线导出业务 `post/comment` Parquet，先建业务 sanity/eval set
+- [ ] 推理接口（CLI 单条 + 批量 parquet → parquet）
+- [ ] 部署形态（API / 离线批处理 / 二者皆可）
+- [ ] 错误分析：usual 上 "愤怒↔悲伤" 互混 ~280 条，ERNIE 没解决，先看这块
+  - 可能和冲突标签相关（usual_train 82 处）—— spot-check 几条
 
 ## 远期
 
-- [ ] **lr schedule 探索**（这次 epochs=8 实验暴露的方向）：
-  - 当前 `linear_schedule_with_warmup` 让 best 严重依赖 lr→0 的"末班车"
-  - 候选：`cosine_schedule_with_warmup`（最后 lr 也→0 但曲线更平滑）/ 
-    `constant_with_warmup`（warmup 后 plateau，靠 early stop 和 weight_decay 控）/
-    `ReduceLROnPlateau`（macro_f1 不涨就 ×0.5）
-  - 一组对照：ERNIE × virus 用 cosine 跑 5 epoch + 8 epoch 两次，看 best epoch 分布
-- [ ] 错误分析：usual 上 "愤怒↔悲伤" 互混 ~280 条，ERNIE 没解决，先看这块
-  - 可能和冲突标签相关（usual_train 82 处 / virus_train 65 处）—— spot-check 几条
-- [ ] virus 顽疾针对性方案：积极占 51% 导致模型偏向积极
-  - oversample 少数类 / focal loss / 调 class_weights 的具体值（当前 sklearn balanced）
-- [ ] 推理接口（CLI 单条 + 批量 parquet → parquet）
-- [ ] 部署形态（API / 离线批处理 / 二者皆可）
-- [ ] usual + virus 合训实验作对照
+- [ ] 收集少量真实业务样本做 sanity set，优先验证 `ernie-usual` 在实际场景的错误类型
+- [ ] 若业务样本暴露系统性偏差，再考虑增量标注 / 微调；不要优先回到 `virus` 数据集补训练
 - [ ] 整理 `legacy/model_training/`：四组跑完后决定保留 / 重写 / 删除
 
 ## 已敲定决策（之前的"待定"）
 
 | 决策 | 落地 |
 |---|---|
-| usual / virus 单训 vs 合训 | **先单训**，合训留作远期对照 |
-| `max_length` | per-track 默认（usual 128 / virus 192），CLI 可覆盖 |
+| 主线训练数据 | **usual 通用数据集**；`virus` 仅保留为疫情专项参考，不作为默认训练数据 |
+| 默认模型 | **ERNIE + usual**，当前 test macro-F1 `0.7709` / accuracy `0.7972` |
+| `max_length` | 主线 usual 默认 128；virus 参考实验仍用 192 |
 | 混合精度 | `--mixed-precision auto/fp32/fp16/bf16`，auto 规则按 device |
 | tokenize 缓存 vs 动态 | **一次性预编码**（数据小，内存可忽略） |
 | 类权重策略 | sklearn `balanced` 默认，`--class-weights none` 关闭 |
-| 模型选型（短期） | **ERNIE > BERT**，3060 实测两个 track 各 +0.03/+0.05 macro_f1 |
+| 模型选型 | **ERNIE > BERT**；主线不再继续 BERT/virus 调参 |
