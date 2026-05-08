@@ -330,6 +330,9 @@ def run_one_source(args, ck: CKClient, model, tokenizer, device, amp_dtype,
 
 def main() -> None:
     args = parse_args()
+    # CLI 可能传相对路径（如 runs/bert-usual-mixed-v2/best），统一 resolve 成绝对路径，
+    # 避免 .relative_to(ROOT) / .exists() 在不同 cwd 下行为不一致。
+    args.checkpoint = args.checkpoint.resolve()
     if not args.checkpoint.exists():
         raise FileNotFoundError(f'checkpoint 不存在: {args.checkpoint}')
 
@@ -365,10 +368,16 @@ def main() -> None:
     else:
         existing = {st: set() for st in sources}
 
+    # checkpoint 字段写入 CK：仓库内 checkpoint 存相对路径（git 友好、跨机一致），
+    # 仓库外的 checkpoint 退化成绝对路径，不让 relative_to 在 Windows 上抛 ValueError。
+    try:
+        ckpt_field = str(args.checkpoint.relative_to(ROOT))
+    except ValueError:
+        ckpt_field = str(args.checkpoint)
     meta_base = {
         'model_key':     args.model_key,
         'model_version': model_version,
-        'checkpoint':    str(args.checkpoint.relative_to(ROOT)),
+        'checkpoint':    ckpt_field,
     }
 
     for source_type in sources:
