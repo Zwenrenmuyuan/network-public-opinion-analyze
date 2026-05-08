@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 
@@ -88,6 +90,47 @@ class CKClient:
     def query_one(self, sql: str) -> dict[str, Any] | None:
         rows = self.query_json(sql)
         return rows[0] if rows else None
+
+    def stream_json(self, sql: str) -> Iterator[dict[str, Any]]:
+        """流式拉行（FORMAT JSONEachRow），用于扫整表不让响应全进内存。
+
+        调用方式与 query_json 相同；返回生成器，逐行 yield dict。
+        中途中断只要丢弃迭代器即可，httpx 的 stream context 会清理底层连接。
+
+        手动按 '\\n' 拼缓冲分行——httpx 的 iter_lines() 在某些 chunk 边界
+        会把多行拼到一行返回，导致 json.loads 报 Extra data。
+        """
+        if 'FORMAT' not in sql.upper():
+            sql = sql + '\nFORMAT JSONEachRow'
+        with self._client.stream('POST', self._url, content=sql, auth=self._auth) as resp:
+            if resp.status_code != 200:
+                body = resp.read().decode('utf-8', 'replace')[:500]
+                raise CKError(f'CK {resp.status_code}: {body}')
+            buf = ''
+            for chunk in resp.iter_text(chunk_size=65536):
+                buf += chunk
+                while True:
+                    nl = buf.find('\n')
+                    if nl < 0:
+                        break
+                    line, buf = buf[:nl], buf[nl + 1:]
+                    if line:
+                        yield json.loads(line)
+            if buf.strip():
+                yield json.loads(buf)
+
+    def insert_jsoneachrow(self, table: str, rows: list[dict[str, Any]]) -> None:
+        """批量 INSERT FORMAT JSONEachRow；空 rows 直接返回。
+
+        SQL 走 URL query 参数，body 全部留给数据本体（CK HTTP API 标准用法）。
+        """
+        if not rows:
+            return
+        body = '\n'.join(json.dumps(r, ensure_ascii=False) for r in rows).encode('utf-8')
+        url = f'{self._url}?{urlencode({"query": f"INSERT INTO {table} FORMAT JSONEachRow"})}'
+        resp = self._client.post(url, content=body, auth=self._auth)
+        if resp.status_code != 200:
+            raise CKError(f'CK {resp.status_code}: {resp.text[:500]}')
 
     def close(self) -> None:
         self._client.close()
