@@ -15,9 +15,9 @@
           <p class="subtitle">面向话题风险、情绪结构和证据样本的可解释研判工作台</p>
         </div>
         <div class="hero-meta" aria-label="数据快照信息">
-          <span>2026-05-01 00:00 - 2026-05-07 23:59</span>
-          <span>模型版本：ERNIE mixed-v2</span>
-          <strong class="risk-badge">高风险关注</strong>
+          <span id="dataWindowSpan">加载中...</span>
+          <span id="modelSpan">加载中...</span>
+          <strong class="risk-badge" id="riskBadge">数据快照</strong>
         </div>
       </header>
 
@@ -80,18 +80,16 @@
                 <h2>模型可解释小面板</h2>
               </div>
             </div>
-            <div class="model-metrics">
-              <div><strong>0.742</strong><span>macro-F1</span></div>
-              <div><strong>84.6%</strong><span>业务验证集 accuracy</span></div>
+            <div class="model-metrics" id="modelMetrics">
+              <div><strong>—</strong><span>加载中...</span></div>
             </div>
-            <div class="confusion-box">
+            <div class="confusion-box" id="confusionBox">
               <h3>易混淆标签</h3>
-              <p>愤怒 vs 中性：含反讽或投诉事实陈述时边界较近。</p>
-              <p>恐惧 vs 悲伤：公共安全事件中需结合风险词和未来不确定性。</p>
+              <p class="muted">加载中...</p>
             </div>
-            <div class="compare-box">
+            <div class="compare-box" id="compareBox">
               <h3>BERT 对照说明</h3>
-              <p>ERNIE mixed-v2 在业务验证集上对愤怒、恐惧召回更稳定；BERT 作为回归对照，用于观察新增业务样本是否带来类别偏移。</p>
+              <p class="muted">加载中...</p>
             </div>
           </article>
 
@@ -102,12 +100,8 @@
                 <h2>数据口径提示</h2>
               </div>
             </div>
-            <ul>
-              <li>当前页面为 Demo 数据 / 数据快照，不连接 ClickHouse。</li>
-              <li>评论为采样集合，不代表全量评论分布。</li>
-              <li>互动数来自 post_engagement_ts 快照。</li>
-              <li>时间展示统一为东八区。</li>
-              <li>用户画像仅展示 tier 级别，不做个人识别。</li>
+            <ul id="dataQualityList">
+              <li class="muted">加载中...</li>
             </ul>
           </aside>
         </section>
