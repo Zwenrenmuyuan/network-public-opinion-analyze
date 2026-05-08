@@ -20,6 +20,13 @@ data/processed_*/
 data/annotation/
 data/business/
 
+# Dashboard 业务数据：从 ClickHouse 导出，含真实用户内容
+data/dashboard/raw/
+data/dashboard/processed/
+data/dashboard/predictions/
+data/dashboard/aggregates/
+data/dashboard/json/
+
 # 训练产物
 **/saved_models/
 **/checkpoints/

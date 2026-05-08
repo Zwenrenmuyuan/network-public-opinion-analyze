@@ -5,6 +5,7 @@ description = "中文社交媒体短文本 6 分类情感分析（基于 SMP2020
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "flask>=3.0.0",
     "httpx>=0.28.1",
     "openpyxl>=3.1.5",
     "pandas>=3.0.2",

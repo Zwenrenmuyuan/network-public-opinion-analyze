@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>社交媒体舆情智能研判平台</title>
+    <link rel="stylesheet" href="./static/css/dashboard.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero panel">
+        <div>
+          <p class="eyebrow">Demo 数据 / 数据快照</p>
+          <h1>社交媒体舆情智能研判平台</h1>
+          <p class="subtitle">面向话题风险、情绪结构和证据样本的可解释研判工作台</p>
+        </div>
+        <div class="hero-meta" aria-label="数据快照信息">
+          <span>2026-05-01 00:00 - 2026-05-07 23:59</span>
+          <span>模型版本：ERNIE mixed-v2</span>
+          <strong class="risk-badge">高风险关注</strong>
+        </div>
+      </header>
+
+      <main>
+        <section class="kpi-grid" id="kpiGrid" aria-label="核心指标"></section>
+
+        <section class="main-grid">
+          <article class="panel trend-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">六类情绪趋势</p>
+                <h2>情绪结构变化</h2>
+              </div>
+              <div class="legend" id="emotionLegend"></div>
+            </div>
+            <div class="chart-wrap">
+              <svg id="trendChart" viewBox="0 0 760 300" role="img" aria-label="情绪趋势堆叠面积图"></svg>
+            </div>
+          </article>
+
+          <article class="panel topic-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">点击话题查看解释</p>
+                <h2>风险话题榜</h2>
+              </div>
+            </div>
+            <div class="topic-list" id="topicList"></div>
+          </article>
+
+          <article class="panel explain-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Risk score attribution</p>
+                <h2 id="explainTitle">风险解释卡</h2>
+              </div>
+              <span class="pill" id="explainScore"></span>
+            </div>
+            <div class="risk-bars" id="riskBars"></div>
+            <p class="explain-note" id="explainNote"></p>
+          </article>
+        </section>
+
+        <section class="lower-grid">
+          <article class="panel evidence-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Representative evidence</p>
+                <h2>代表性样本 / 证据流</h2>
+              </div>
+              <span class="pill muted" id="evidenceFilter">全部话题</span>
+            </div>
+            <div class="evidence-list" id="evidenceList"></div>
+          </article>
+
+          <article class="panel model-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Model explainability</p>
+                <h2>模型可解释小面板</h2>
+              </div>
+            </div>
+            <div class="model-metrics">
+              <div><strong>0.742</strong><span>macro-F1</span></div>
+              <div><strong>84.6%</strong><span>业务验证集 accuracy</span></div>
+            </div>
+            <div class="confusion-box">
+              <h3>易混淆标签</h3>
+              <p>愤怒 vs 中性：含反讽或投诉事实陈述时边界较近。</p>
+              <p>恐惧 vs 悲伤：公共安全事件中需结合风险词和未来不确定性。</p>
+            </div>
+            <div class="compare-box">
+              <h3>BERT 对照说明</h3>
+              <p>ERNIE mixed-v2 在业务验证集上对愤怒、恐惧召回更稳定；BERT 作为回归对照，用于观察新增业务样本是否带来类别偏移。</p>
+            </div>
+          </article>
+
+          <aside class="panel scope-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Data scope</p>
+                <h2>数据口径提示</h2>
+              </div>
+            </div>
+            <ul>
+              <li>当前页面为 Demo 数据 / 数据快照，不连接 ClickHouse。</li>
+              <li>评论为采样集合，不代表全量评论分布。</li>
+              <li>互动数来自 post_engagement_ts 快照。</li>
+              <li>时间展示统一为东八区。</li>
+              <li>用户画像仅展示 tier 级别，不做个人识别。</li>
+            </ul>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script src="./static/js/pages/dashboard.js"></script>
+  </body>
+</html>
