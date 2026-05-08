@@ -4,12 +4,14 @@
   1. 加载 ERNIE checkpoint
   2. 查 dashboard.sentiment_prediction 当前 model_version 已有的 (source_type, source_id) → 跳过集
   3. 按 source_type=post 然后 comment：
-       流式 SELECT weibo.{source_type}（按主键 ORDER）
+       keyset 分页 SELECT weibo.{source_type}（每页默认 50000，按主键 > 上一页末尾）
        → 已存在的跳过
        → clean_text 清洗 → 空文本丢弃 → blake2b(8) 算 content_hash
        → 攒满 model_batch (默认 64) GPU 推一次
        → 攒满 write_batch (默认 5000) INSERT 一次
 
+CK 网络异常自动重试：所有 SELECT/INSERT 都包了指数退避重试（默认 5 次，
+2/4/8/16/32s），CK 短暂抖动或重启不会让脚本挂掉。
 ReplacingMergeTree(predicted_at) 容错：即使重复写同样的
 (model_version, source_type, source_id) 也只保留最新；--no-resume 强行重跑也无害。
 
@@ -38,7 +40,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / 'dashboard'))
 sys.path.insert(0, str(ROOT / 'scripts'))
 
-from ck import CKClient  # noqa: E402
+from ck import CKClient, CKNetworkError  # noqa: E402
 from preprocess import clean_text  # noqa: E402
 
 from npo.config import DEFAULT_MAX_LENGTH, ID2LABEL  # noqa: E402
@@ -85,10 +87,44 @@ def parse_args() -> argparse.Namespace:
                    help='不写 CK；走完整流程并打印前 3 行预测样例')
     p.add_argument('--no-resume', action='store_true',
                    help='不查已有预测，全量推；ReplacingMergeTree 自动去重')
+    p.add_argument('--ck-timeout', type=float, default=120.0,
+                   help='CKClient HTTP 单次超时秒数（默认 120）；大 SELECT/INSERT 走得久就调大')
+    p.add_argument('--page-size', type=int, default=50000,
+                   help='每页 SELECT 行数（默认 50000）；网络抖动时整页可重试')
+    p.add_argument('--max-retries', type=int, default=5,
+                   help='单次 CK 操作的最大尝试次数（默认 5），含首次；指数退避，单次最多等 60s')
+    p.add_argument('--retry-delay', type=float, default=2.0,
+                   help='重试基础退避秒数（默认 2）；第 N 次等 min(60, base * 2^(N-1))')
     return p.parse_args()
 
 
 # -------- helpers --------
+
+# 重试配置：main() 里按 CLI 覆盖；模块级是为了 retry_on_network 不用层层传参。
+_RETRY_CONF = {'attempts': 5, 'base_delay': 2.0}
+_RETRY_MAX_DELAY = 60.0
+
+
+def retry_on_network(fn, *, what: str = '操作'):
+    """对 CKNetworkError 指数退避重试；其它异常直接抛。
+
+    `attempts` 含首次尝试，所以 attempts=5 = 1 次正常 + 4 次重试。
+    `base_delay` 控制指数退避起点，单次等待 cap 在 _RETRY_MAX_DELAY 防止配置错。
+    """
+    attempts = _RETRY_CONF['attempts']
+    base_delay = _RETRY_CONF['base_delay']
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except CKNetworkError as e:
+            if attempt == attempts:
+                logger.error(f'{what}：{attempts} 次尝试均失败 → 放弃: {e}')
+                raise
+            delay = min(_RETRY_MAX_DELAY, base_delay * (2 ** (attempt - 1)))
+            logger.warning(f'{what}：第 {attempt}/{attempts} 次失败 ({e})；'
+                           f'{delay:.1f}s 后重试')
+            time.sleep(delay)
+
 
 def content_hash_uint64(text: str) -> int:
     """blake2b 8 字节 → UInt64。稳定、跨进程一致、不依赖 PYTHONHASHSEED。"""
@@ -102,11 +138,12 @@ def infer_model_version(checkpoint: Path) -> str:
 def load_existing_ids(ck: CKClient, model_version: str,
                       source_types: list[str]) -> dict[str, set[int]]:
     """查指定 model_version 下已经预测过的 (source_type, source_id)。"""
-    rows = ck.query_json(f"""
+    sql = f"""
         SELECT source_type, source_id
         FROM {TARGET_TABLE}
         WHERE model_version = '{model_version}'
-    """)
+    """
+    rows = retry_on_network(lambda: ck.query_json(sql), what='查已有预测')
     out: dict[str, set[int]] = {st: set() for st in source_types}
     for r in rows:
         st = r['source_type']
@@ -142,25 +179,44 @@ def predict_batch(model, tokenizer, contents: list[str], device: torch.device,
 
 # -------- pipeline --------
 
-def stream_source(ck: CKClient, source_type: str, limit: int | None) -> Iterator[dict]:
-    """流式拉 weibo.post / weibo.comment 的推理需要列。
+def stream_source(ck: CKClient, source_type: str, limit: int | None,
+                  page_size: int) -> Iterator[dict]:
+    """按主键 keyset 分页拉 weibo.post / weibo.comment 的推理需要列。
 
-    ORDER BY 主键保证断点续推时拉取顺序稳定；CK 主键就是 post_id/comment_id，
-    所以 ORDER BY 走索引顺序，无额外排序成本。
-    created_at 已经是 UTC 存储的 DateTime，toString 直接给 'YYYY-MM-DD HH:MM:SS'。
+    每页 query_json 一次取回；网络失败由 retry_on_network 整页重试，丢失粒度
+    最多 page_size 行。优于 stream_json：流式拉中途断开，已 yield 的行无法
+    回滚，重试只能从头再来。
+    keyset 分页 (WHERE pk > last_id ORDER BY pk LIMIT n) 在 CK 上走主键索引，
+    不会随翻页变慢，比 OFFSET 快得多。
+    created_at 已是 UTC 存储，toString 直接给 'YYYY-MM-DD HH:MM:SS'。
     """
     pk = 'post_id' if source_type == 'post' else 'comment_id'
-    sql = f"""
-        SELECT {pk} AS source_id,
-               post_id,
-               toString(created_at) AS source_created_at,
-               text_raw
-        FROM weibo.{source_type}
-        ORDER BY {pk}
-    """
-    if limit:
-        sql += f' LIMIT {limit}'
-    return ck.stream_json(sql)
+    last_id = 0
+    pulled = 0
+    while True:
+        if limit is not None and pulled >= limit:
+            return
+        n = page_size if limit is None else min(page_size, limit - pulled)
+        sql = f"""
+            SELECT {pk} AS source_id,
+                   post_id,
+                   toString(created_at) AS source_created_at,
+                   text_raw
+            FROM weibo.{source_type}
+            WHERE {pk} > {last_id}
+            ORDER BY {pk}
+            LIMIT {n}
+        """
+        rows = retry_on_network(
+            lambda sql=sql: ck.query_json(sql),
+            what=f'拉 {source_type} after {pk}={last_id}',
+        )
+        if not rows:
+            return
+        for r in rows:
+            yield r
+        last_id = int(rows[-1]['source_id'])
+        pulled += len(rows)
 
 
 def make_row(meta: dict, src: dict, content_hash: int,
@@ -225,12 +281,16 @@ def run_one_source(args, ck: CKClient, model, tokenizer, device, amp_dtype,
                     logger.info('  ' + json.dumps(r, ensure_ascii=False))
                 sample_logged[0] = True
         else:
-            ck.insert_jsoneachrow(TARGET_TABLE, write_buf)
+            payload = list(write_buf)  # 拷贝一份，重试时即使 write_buf 已清也安全
+            retry_on_network(
+                lambda: ck.insert_jsoneachrow(TARGET_TABLE, payload),
+                what=f'INSERT {len(payload)} 行',
+            )
         counters['written'] += len(write_buf)
         write_buf.clear()
 
     t_start = time.time()
-    for src in stream_source(ck, source_type, args.limit):
+    for src in stream_source(ck, source_type, args.limit, args.page_size):
         counters['pulled'] += 1
         sid = int(src['source_id'])
         if sid in existing_ids:
@@ -277,6 +337,9 @@ def main() -> None:
     if not VERSION_RE.fullmatch(model_version):
         raise ValueError(f'非法 model_version (只允许字母数字 _ - .): {model_version!r}')
 
+    _RETRY_CONF['attempts'] = args.max_retries
+    _RETRY_CONF['base_delay'] = args.retry_delay
+
     device = get_device()
     amp_dtype = select_amp_dtype(device, 'auto')
     logger.info(f'device={device} amp={amp_dtype}')
@@ -285,11 +348,13 @@ def main() -> None:
     model = (AutoModelForSequenceClassification
              .from_pretrained(args.checkpoint).to(device).eval())
 
-    ck = CKClient()
+    ck = CKClient(timeout=args.ck_timeout)
     logger.info(f'CK: {ck.host}:{ck.port}  →  {TARGET_TABLE}')
     logger.info(f'model_version={model_version} model_key={args.model_key} '
                 f'max_length={args.max_length} model_batch={args.model_batch} '
-                f'write_batch={args.write_batch} dry_run={args.dry_run}')
+                f'write_batch={args.write_batch} page_size={args.page_size} '
+                f'ck_timeout={args.ck_timeout}s max_retries={args.max_retries} '
+                f'dry_run={args.dry_run}')
 
     sources = ['post', 'comment'] if args.source == 'both' else [args.source]
     if not args.no_resume:

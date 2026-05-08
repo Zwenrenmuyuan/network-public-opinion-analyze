@@ -48,6 +48,16 @@ class CKError(Exception):
     pass
 
 
+class CKNetworkError(CKError):
+    """网络层异常（超时、连接断开、读写中断等）。
+
+    专门分一类是为了让调用方区分「该重试」和「该放弃」：
+      - CKNetworkError    → 网络抖动 / CK 重启，外层可指数退避重试
+      - 其它 CKError       → SQL 错、权限错、协议错，重试也是同样错，应直接抛
+    """
+    pass
+
+
 class CKClient:
     def __init__(
         self,
@@ -72,8 +82,16 @@ class CKClient:
         self._auth = httpx.BasicAuth(self.user, self.password)
         self._client = httpx.Client(timeout=timeout)
 
-    def _post(self, sql: str) -> httpx.Response:
-        resp = self._client.post(self._url, content=sql, auth=self._auth)
+    def _post(self, sql: str, body: bytes | None = None) -> httpx.Response:
+        """body=None：SQL 走 body（普通查询）；body!=None：SQL 走 URL，body 是数据（INSERT FORMAT）。"""
+        try:
+            if body is None:
+                resp = self._client.post(self._url, content=sql, auth=self._auth)
+            else:
+                url = f'{self._url}?{urlencode({"query": sql})}'
+                resp = self._client.post(url, content=body, auth=self._auth)
+        except httpx.RequestError as e:
+            raise CKNetworkError(f'CK 网络异常: {type(e).__name__}: {e}') from e
         if resp.status_code != 200:
             raise CKError(f'CK {resp.status_code}: {resp.text[:500]}')
         return resp
@@ -95,29 +113,34 @@ class CKClient:
         """流式拉行（FORMAT JSONEachRow），用于扫整表不让响应全进内存。
 
         调用方式与 query_json 相同；返回生成器，逐行 yield dict。
-        中途中断只要丢弃迭代器即可，httpx 的 stream context 会清理底层连接。
+        网络型异常会被转成 CKNetworkError 抛出（包括 stream 中途断开）。
+        但已 yield 出去的行无法回滚——调用方若要重试必须从头再调一次。
+        大批量场景更推荐"分页 query_json + 调用方重试"，丢失粒度只到一页。
 
         手动按 '\\n' 拼缓冲分行——httpx 的 iter_lines() 在某些 chunk 边界
         会把多行拼到一行返回，导致 json.loads 报 Extra data。
         """
         if 'FORMAT' not in sql.upper():
             sql = sql + '\nFORMAT JSONEachRow'
-        with self._client.stream('POST', self._url, content=sql, auth=self._auth) as resp:
-            if resp.status_code != 200:
-                body = resp.read().decode('utf-8', 'replace')[:500]
-                raise CKError(f'CK {resp.status_code}: {body}')
-            buf = ''
-            for chunk in resp.iter_text(chunk_size=65536):
-                buf += chunk
-                while True:
-                    nl = buf.find('\n')
-                    if nl < 0:
-                        break
-                    line, buf = buf[:nl], buf[nl + 1:]
-                    if line:
-                        yield json.loads(line)
-            if buf.strip():
-                yield json.loads(buf)
+        try:
+            with self._client.stream('POST', self._url, content=sql, auth=self._auth) as resp:
+                if resp.status_code != 200:
+                    body = resp.read().decode('utf-8', 'replace')[:500]
+                    raise CKError(f'CK {resp.status_code}: {body}')
+                buf = ''
+                for chunk in resp.iter_text(chunk_size=65536):
+                    buf += chunk
+                    while True:
+                        nl = buf.find('\n')
+                        if nl < 0:
+                            break
+                        line, buf = buf[:nl], buf[nl + 1:]
+                        if line:
+                            yield json.loads(line)
+                if buf.strip():
+                    yield json.loads(buf)
+        except httpx.RequestError as e:
+            raise CKNetworkError(f'CK 流式异常: {type(e).__name__}: {e}') from e
 
     def insert_jsoneachrow(self, table: str, rows: list[dict[str, Any]]) -> None:
         """批量 INSERT FORMAT JSONEachRow；空 rows 直接返回。
@@ -127,10 +150,7 @@ class CKClient:
         if not rows:
             return
         body = '\n'.join(json.dumps(r, ensure_ascii=False) for r in rows).encode('utf-8')
-        url = f'{self._url}?{urlencode({"query": f"INSERT INTO {table} FORMAT JSONEachRow"})}'
-        resp = self._client.post(url, content=body, auth=self._auth)
-        if resp.status_code != 200:
-            raise CKError(f'CK {resp.status_code}: {resp.text[:500]}')
+        self._post(f'INSERT INTO {table} FORMAT JSONEachRow', body=body)
 
     def close(self) -> None:
         self._client.close()
