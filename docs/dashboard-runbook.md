@@ -14,6 +14,10 @@ dashboard 后端从仓库根目录 `.env` 或进程环境读取 ClickHouse 配�
 - `READONLY_USER`
 - `READONLY_PASSWORD`
 
+可选变量：
+
+- `REDIS_URL`：API 缓存后端，例如 `redis://localhost:16379/0` 或 `redis://:<password>@<host>:<port>/<db>`；未设或连接失败时自动降级到进程内 dict（多 worker 不共享）。
+
 运行原则：
 
 - 浏览器只请求同源 `/api/dashboard/*`。
@@ -118,8 +122,11 @@ uv run gunicorn -w 4 -b 0.0.0.0:8000 dashboard.server:app
 ```
 
 worker 数量按 CPU 核心 `2 * cores + 1` 估，全部走 sync worker（dashboard 是 IO-bound，
-但 CK 客户端是同步 httpx，gevent/eventlet 没必要）。Cache 是进程内 dict，多 worker 之间
-不共享——每个 worker 第一次冷请求各走一次 CK，可接受；要全局缓存再换 Redis。
+但 CK 客户端是同步 httpx，gevent/eventlet 没必要）。
+
+缓存后端按 `.env` 的 `REDIS_URL` 决定：配了就用 Redis，多 worker 之间共享同一份缓存命中，
+单点失效；没配或 Redis 不可达时降级到进程内 dict，多 worker 间不共享但不影响功能。
+启动行会打印 `cache=redis @ host:port` 或 `cache=in-memory`，看一眼就知道生效的是哪一种。
 
 ### 6.2 ClickHouse 只读账号
 
@@ -190,7 +197,10 @@ server {
 ### 6.5 资源限制与监控
 
 - gunicorn `--max-requests 1000 --max-requests-jitter 100` 避免 worker 长时间运行
-  累积内存（cache dict 没有上限）。
+  累积内存。Redis 后端时 cache 数据在 Redis 而不在 worker 内存里；fallback 到 in-memory
+  时 worker 重启会清空 cache，可作隐式上限。
+- Redis 端配 `maxmemory` + `maxmemory-policy allkeys-lru`，给 dashboard 缓存设硬上限，
+  避免大量关键词搜索把内存吃满。
 - 关注 CK 端 `system.query_log` 看慢查询，如果 `risk-topics` / `topics/<id>` 频繁慢，
   说明 cache 没命中，检查前端是否一直带不同参数。
 - 后端 stdout 已经打印 `dashboard_api {path} status=... elapsed_ms=...`，接到日志

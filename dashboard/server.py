@@ -19,6 +19,7 @@ os.environ.setdefault('FLASK_SKIP_DOTENV', '1')
 from flask import Flask, send_from_directory
 
 from api import create_dashboard_api
+from api.cache import init_cache
 from ck import CKClient
 
 DASHBOARD_DIR = Path(__file__).resolve().parent
@@ -27,6 +28,7 @@ PROJECT_ROOT = DASHBOARD_DIR.parent
 app = Flask(__name__, static_folder=None)
 app.json.ensure_ascii = False
 ck = CKClient()
+cache_backend = init_cache(os.getenv('REDIS_URL'))
 app.register_blueprint(create_dashboard_api(ck, PROJECT_ROOT))
 
 
@@ -46,7 +48,7 @@ def main() -> None:
     p.add_argument('--port', type=int, default=8000)
     p.add_argument('--debug', action='store_true')
     args = p.parse_args()
-    print(f'Dashboard 后端启动: http://localhost:{args.port}/  ->  CK={ck.host}:{ck.port}')
+    print(f'Dashboard 后端启动: http://localhost:{args.port}/  ->  CK={ck.host}:{ck.port}  cache={cache_backend}')
     app.run(host=args.host, port=args.port, debug=args.debug)
 
 
