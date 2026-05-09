@@ -97,12 +97,12 @@ class CKClient:
         return resp
 
     def query_text(self, sql: str) -> str:
-        return self._post(sql).text.strip()
+        return self._post(sql).content.decode('utf-8').strip()
 
     def query_json(self, sql: str) -> list[dict[str, Any]]:
         if 'FORMAT' not in sql.upper():
             sql = sql + '\nFORMAT JSONEachRow'
-        text = self._post(sql).text
+        text = self._post(sql).content.decode('utf-8')
         return [json.loads(line) for line in text.splitlines() if line]
 
     def query_one(self, sql: str) -> dict[str, Any] | None:
