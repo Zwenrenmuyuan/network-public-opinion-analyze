@@ -12,6 +12,8 @@ PRIMARY_MODEL_NAME = 'ERNIE mixed-v2'
 PRIMARY_MODEL_VERSION = 'ernie-usual-mixed-v2'
 PRIMARY_CHECKPOINT = 'runs/ernie-usual-mixed-v2/best'
 SECONDARY_MODEL_NAME = 'BERT mixed-v2'
+SECONDARY_MODEL_VERSION = 'bert-usual-mixed-v2'
+SECONDARY_CHECKPOINT = 'runs/bert-usual-mixed-v2/best'
 BERT_USAGE = '对照模型与困难样本发现工具'
 
 DISPLAY_TZ = timezone(timedelta(hours=8))  # Asia/Shanghai
@@ -40,6 +42,8 @@ ACTOR_MAX_LIMIT = 50
 ACTOR_CANDIDATE_LIMIT = 300
 INFLUENCE_DEFAULT_LIMIT = 80
 INFLUENCE_MAX_LIMIT = 200
+DISAGREEMENT_DEFAULT_LIMIT = 6
+DISAGREEMENT_MAX_LIMIT = 30
 LOW_CONFIDENCE_THRESHOLD = 0.70
 LOW_MARGIN_THRESHOLD = 0.15
 SOURCE_TYPES = ('hot', 'keyword', 'kol', 'retweet')

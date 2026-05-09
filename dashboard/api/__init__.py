@@ -11,6 +11,7 @@ from werkzeug.exceptions import HTTPException
 from ck import CKError, CKNetworkError
 
 from .actors import register_actor_routes
+from .disagreement import register_disagreement_routes
 from .evidence import register_evidence_routes
 from .model_quality import register_model_quality_routes
 from .risk import register_risk_routes
@@ -61,6 +62,7 @@ def create_dashboard_api(ck, project_root: Path) -> Blueprint:
     register_actor_routes(api, ck)
     register_evidence_routes(api, ck)
     register_model_quality_routes(api, project_root)
+    register_disagreement_routes(api, ck)
 
     @api.route('/<path:_unused>')
     def _api_not_found(_unused: str):

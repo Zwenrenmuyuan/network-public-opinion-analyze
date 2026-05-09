@@ -287,9 +287,68 @@ h3 { margin-bottom: 8px; font-size: 14px; }
 }
 .role-chip.verified { background: #fff3e8; color: #b6580c; border-color: #ffd7b3; }
 
+/* per-class F1（model-card 内业务集 × SMP test 对比） */
+.per-class-box { margin-top: 16px; }
+.per-class-box h3 { font-size: 13px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+.per-class-list { display: grid; gap: 6px; }
+.per-class-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 50px 50px;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+}
+.per-class-label { color: var(--ink); font-weight: 600; }
+.per-class-bar { height: 8px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+.per-class-bar-fill { height: 100%; border-radius: 4px; transition: width 240ms ease; }
+.per-class-business { font-weight: 700; color: var(--ink); text-align: right; }
+.per-class-smp { color: var(--muted); font-size: 11px; text-align: right; }
+
+/* disagreement (ERNIE vs BERT 业务集对照) */
+.disagreement-card { padding: 22px; margin-top: 16px; }
+.disagreement-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 12px;
+}
+.disagreement-block h3 {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.disagreement-chart { width: 100%; height: 360px; }
+.disagreement-samples {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.disagreement-item {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #fff, #fbfcff);
+  display: grid;
+  gap: 8px;
+}
+.disagreement-text { line-height: 1.6; font-size: 13px; color: var(--ink); }
+.disagreement-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+}
+.meta-pill { padding: 4px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+.meta-pill.ernie { background: #e6f4ec; color: #1a7045; border: 1px solid #c1e3cd; }
+.meta-pill.bert  { background: #fdecec; color: #a32028; border: 1px solid #f4cfcf; }
+
 @media (max-width: 1120px) {
   .detail-grid { grid-template-columns: 1fr; }
   .actor-grid { grid-template-columns: 1fr; }
+  .disagreement-grid { grid-template-columns: 1fr; }
   .detail-meta { justify-content: flex-start; max-width: none; }
 }
 

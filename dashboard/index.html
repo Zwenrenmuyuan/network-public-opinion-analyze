@@ -114,6 +114,10 @@
             <div class="model-metrics" id="modelMetrics">
               <div><strong>—</strong><span>加载中...</span></div>
             </div>
+            <div class="per-class-box" id="perClassBox">
+              <h3>各类别 F1</h3>
+              <p class="muted">加载中...</p>
+            </div>
             <div class="confusion-box" id="confusionBox">
               <h3>易混淆标签</h3>
               <p class="muted">加载中...</p>
@@ -161,6 +165,29 @@
             </div>
             <div id="influenceChart" class="echart influence-chart" role="img" aria-label="影响力-情绪散点图"></div>
           </article>
+        </section>
+
+        <section class="panel disagreement-card" aria-label="业务集双模型分歧">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">业务集 ERNIE × BERT 全量对照</p>
+              <h2>双模型分歧分析</h2>
+              <p class="subtitle muted" id="disagreementSummary">加载中...</p>
+            </div>
+            <span class="pill muted" id="disagreementMeta">—</span>
+          </div>
+          <div class="disagreement-grid">
+            <div class="disagreement-block">
+              <h3>分歧矩阵（行=ERNIE，列=BERT）</h3>
+              <div id="disagreementMatrix" class="echart disagreement-chart" role="img" aria-label="ERNIE 与 BERT 分歧矩阵"></div>
+            </div>
+            <div class="disagreement-block">
+              <h3>高置信分歧样本</h3>
+              <div id="disagreementSamples" class="disagreement-samples">
+                <p class="muted">加载中...</p>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     </div>

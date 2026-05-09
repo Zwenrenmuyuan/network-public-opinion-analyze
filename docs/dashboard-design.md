@@ -14,8 +14,9 @@
 | 总览 API | 已实现 | `meta`、`data-quality`、`overview`、`emotion-timeseries`、`risk-topics`。 |
 | 详情 API | 已实现 | `topics/{topic_id}`、`actors`、`influence-emotion`、`evidence`。 |
 | 模型质量 API | 已实现 | 读取 `runs/ernie-usual-mixed-v2/*` 和模型分歧摘要。 |
-| 前端 v1 | 已实现 | 单页工作台，含时间范围、话题详情、关键账号、影响力矩阵。 |
-| 缓存 | 未实现 | 当前直接查 CK，并记录 API 耗时；慢了再加 TTL cache 或聚合表。 |
+| 业务集双模型分歧 API | 已实现 | `model-disagreement` 直接读 `dashboard.sentiment_prediction` 算 ERNIE × BERT 一致率、6×6 分歧矩阵和高置信分歧样本。 |
+| 前端 v1 | 已实现 | 单页工作台，含时间范围、话题详情、关键账号、影响力矩阵、双模型分歧。 |
+| 缓存 | 已实现 | `dashboard/api/cache.py` 默认 5 分钟 TTL，命中 path+query_string 进程内缓存，覆盖 overview / emotion-timeseries / risk-topics / topics / actors / influence-emotion / model-quality / model-disagreement。 |
 | 搜索/分页/反馈 | 未实现 | 属于 Phase 5 后端增强。 |
 
 当前 v1 已完成核心分析闭环，但还不是完整生产后台。生产化仍需要缓存、权限、查询超时、分页搜索和反馈闭环。
@@ -72,6 +73,7 @@ ClickHouse weibo.* 原始表
 | `dashboard/api/actors.py` | 关键账号和影响力-情绪矩阵。 |
 | `dashboard/api/evidence.py` | 代表性证据样本。 |
 | `dashboard/api/model_quality.py` | 模型质量与 BERT 对照摘要。 |
+| `dashboard/api/disagreement.py` | 业务集 ERNIE × BERT 全量对照（一致率、分歧矩阵、高置信分歧样本）。 |
 | `dashboard/index.html` | 单页工作台结构。 |
 | `dashboard/static/js/pages/dashboard.js` | 前端状态、API 对接、ECharts 渲染。 |
 | `dashboard/static/css/dashboard.css` | 页面样式。 |
@@ -163,6 +165,7 @@ source_type + source_id + model_version
 | `GET /influence-emotion` | `range`, `topic_id`, `limit` | 影响力-情绪散点图 | 已实现 |
 | `GET /evidence` | `range`, `topic_id`, `limit` | 代表性证据样本 | 已实现 |
 | `GET /model-quality` | 无 | ERNIE/BERT 指标、混淆、分歧摘要 | 已实现 |
+| `GET /model-disagreement` | `limit` | 业务集 ERNIE × BERT 一致率、6×6 分歧矩阵、Top N 高置信分歧样本 | 已实现 |
 
 ### 7.1 `meta`
 
@@ -377,13 +380,6 @@ GET /api/dashboard/evidence?range=all_available&topic_id={topic_id}&limit=3
 - 页面中评论口径显示为“采样评论”。
 
 ## 11. 后续待办
-
-优先级高：
-
-- 清理 API 小债：避免任何无意义 `SELECT *`，统一错误响应格式。
-- 根据 API 耗时决定是否加 TTL cache。
-- 给生产部署增加查询超时、只读账号和最小权限说明。
-- 补模型解释页的 per-class F1、低置信样本和分歧样本详情。
 
 优先级中：
 

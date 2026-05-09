@@ -47,6 +47,7 @@ const state = {
   influenceEmotion: [],
   dataQuality: null,
   modelQuality: null,
+  disagreement: null,
 };
 
 // 请求序号防御：切换 range / topic 时分别 +1。异步返回时校对序号，
@@ -320,6 +321,36 @@ function renderModelQuality() {
     <div><strong>${escapeHTML(m.v)}</strong><span>${escapeHTML(m.s)}</span></div>
   `).join("");
 
+  // per-class F1：以业务集为主条形（颜色随情绪），SMP test 作为右侧参考数字。
+  const beF1 = (be && be.per_class_f1) || {};
+  const stF1 = (st && st.per_class_f1) || {};
+  const hasPerClass = Object.keys(beF1).length || Object.keys(stF1).length;
+  if (!hasPerClass) {
+    el("#perClassBox").innerHTML = '<h3>各类别 F1</h3><p class="muted">无可用数据</p>';
+  } else {
+    el("#perClassBox").innerHTML = `
+      <h3>各类别 F1（业务集 / SMP test）</h3>
+      <div class="per-class-list">
+        ${EMOTIONS.map((name) => {
+          const beVal = Number(beF1[name] || 0);
+          const stVal = stF1[name] == null ? null : Number(stF1[name]);
+          const pct = Math.max(0, Math.min(100, beVal * 100));
+          const stText = stVal == null ? "—" : stVal.toFixed(3);
+          return `
+            <div class="per-class-row">
+              <span class="per-class-label">${escapeHTML(name)}</span>
+              <div class="per-class-bar">
+                <div class="per-class-bar-fill" style="width:${pct.toFixed(0)}%;background:${COLORS[name]}"></div>
+              </div>
+              <span class="per-class-business">${beVal ? beVal.toFixed(3) : "—"}</span>
+              <span class="per-class-smp">${escapeHTML(stText)}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
   const confusions = mq.top_confusions || [];
   el("#confusionBox").innerHTML = `
     <h3>易混淆标签（业务集 Top ${confusions.length}）</h3>
@@ -339,6 +370,80 @@ function renderModelQuality() {
       <p>分歧样本中 ${escapeHTML(mq.primary_model)} 多答对 ${escapeHTML(bc.ernie_only_correct)} 条，BERT 多答对 ${escapeHTML(bc.bert_only_correct)} 条。</p>
     `;
   }
+}
+
+function renderDisagreement() {
+  const d = state.disagreement;
+  if (!d) return;
+  const labels = (d.labels && d.labels.length) ? d.labels : EMOTIONS;
+
+  el("#disagreementSummary").innerHTML =
+    `${escapeHTML(d.primary_model)} vs ${escapeHTML(d.secondary_model)} · ` +
+    `共 ${formatLargeNumber(d.samples_total)} 条对照样本 · ` +
+    `一致率 <strong>${escapeHTML(formatPercent(d.agreement_rate, 2))}</strong>`;
+  el("#disagreementMeta").textContent = `分歧 ${formatLargeNumber(d.samples_total - d.agreement_count)} 条`;
+
+  // heatmap：x=BERT 预测, y=ERNIE 预测, value=count。对角线即一致 cell。
+  const matrix = d.matrix || [];
+  const data = matrix.map((c) => {
+    const yi = labels.indexOf(c.ernie_label);
+    const xi = labels.indexOf(c.bert_label);
+    return [xi, yi, Number(c.count || 0)];
+  });
+  const maxN = data.reduce((m, p) => Math.max(m, p[2]), 0) || 1;
+  renderChart("disagreementMatrix", {
+    tooltip: {
+      position: "top",
+      formatter: (p) =>
+        `ERNIE：${escapeHTML(labels[p.value[1]])}<br/>` +
+        `BERT：${escapeHTML(labels[p.value[0]])}<br/>` +
+        `样本：${formatLargeNumber(p.value[2])}`,
+    },
+    grid: { top: 24, left: 60, right: 16, bottom: 70, containLabel: true },
+    xAxis: {
+      type: "category", data: labels, name: "BERT", nameGap: 24, nameTextStyle: { color: "#667085" },
+      axisLabel: { color: "#667085", fontSize: 11 },
+      splitArea: { show: true },
+    },
+    yAxis: {
+      type: "category", data: labels, name: "ERNIE", nameGap: 16, nameTextStyle: { color: "#667085" },
+      axisLabel: { color: "#667085", fontSize: 11 },
+      splitArea: { show: true },
+    },
+    visualMap: {
+      min: 0, max: maxN, calculable: true, orient: "horizontal",
+      left: "center", bottom: 4, textStyle: { color: "#667085", fontSize: 11 },
+      inRange: { color: ["#f0f6ff", "#3578d4", "#13294b"] },
+    },
+    series: [{
+      type: "heatmap",
+      data,
+      label: {
+        show: true,
+        fontSize: 10,
+        color: "#172033",
+        formatter: (p) => formatLargeNumber(p.value[2]),
+      },
+      emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.18)" } },
+    }],
+  });
+
+  const samples = d.top_disagreements || [];
+  if (!samples.length) {
+    el("#disagreementSamples").innerHTML = '<p class="muted">没有发现高置信分歧样本</p>';
+    return;
+  }
+  el("#disagreementSamples").innerHTML = samples.map((s) => `
+    <article class="disagreement-item">
+      <p class="disagreement-text">${escapeHTML(s.content || "—")}</p>
+      <div class="disagreement-meta">
+        <span class="meta-pill ernie">ERNIE「${escapeHTML(s.ernie_label)}」 ${escapeHTML(formatPercent(s.ernie_confidence, 0))}</span>
+        <span class="meta-pill bert">BERT「${escapeHTML(s.bert_label)}」 ${escapeHTML(formatPercent(s.bert_confidence, 0))}</span>
+        <span class="meta-pill">${escapeHTML(s.source === "comment" ? "采样评论" : "帖子")}</span>
+        <span class="meta-pill">${escapeHTML(formatDateTime(s.created_at))}</span>
+      </div>
+    </article>
+  `).join("");
 }
 
 // ===========================================================================
@@ -724,8 +829,25 @@ async function loadModelQuality() {
     renderModelQuality();
   } catch (err) {
     el("#modelMetrics").innerHTML = `<div><strong>—</strong><span>加载失败</span></div>`;
+    el("#perClassBox").innerHTML = `<h3>各类别 F1</h3><p class="muted error">加载失败：${escapeHTML(err.message)}</p>`;
     el("#confusionBox").innerHTML = `<h3>易混淆标签</h3><p class="muted error">加载失败：${escapeHTML(err.message)}</p>`;
     el("#compareBox").innerHTML = `<h3>BERT 对照说明</h3><p class="muted error">加载失败：${escapeHTML(err.message)}</p>`;
+  }
+}
+
+async function loadDisagreement() {
+  el("#disagreementSummary").textContent = "加载中...";
+  el("#disagreementMeta").textContent = "—";
+  el("#disagreementSamples").innerHTML = '<p class="muted">加载中...</p>';
+  clearChart("disagreementMatrix", "加载中...");
+  try {
+    state.disagreement = await fetchJSON("/api/dashboard/model-disagreement?limit=6");
+    renderDisagreement();
+  } catch (err) {
+    el("#disagreementSummary").textContent = "加载失败";
+    el("#disagreementMeta").textContent = err.message;
+    el("#disagreementSamples").innerHTML = `<p class="muted error">加载失败：${escapeHTML(err.message)}</p>`;
+    clearChart("disagreementMatrix", `加载失败：${err.message}`);
   }
 }
 
@@ -882,6 +1004,7 @@ async function bootstrap() {
   // 与 range 无关，独立并行
   loadDataQuality();
   loadModelQuality();
+  loadDisagreement();
   // range scoped + topic scoped（topic scoped 会在 risk-topics 解析后被 reloadTopicScopedData 触发）
   reloadRangeScopedData();
 }
