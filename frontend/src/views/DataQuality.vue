@@ -16,7 +16,7 @@ const overview = ref<OverviewResponse | null>(null)
 const errorMsg = ref('')
 
 const SOURCE_TABLES = [
-  { layer: '内容层', tables: 'weibo.post / weibo.comment', usage: '原文、证据流、预测输入', limit: 'comment 为采样评论，不代表全量' },
+  { layer: '内容层', tables: 'weibo.post / weibo.comment', usage: '原文、证据流、预测输入', limit: 'comment 为当前 CK 已采集评论，不代表平台全量' },
   { layer: '情绪层', tables: 'dashboard.sentiment_prediction', usage: '六分类预测、置信度、BERT 对照', limit: '查询必须过滤 model_version' },
   { layer: '热度层', tables: 'weibo.post_engagement_ts', usage: '点赞 / 评论 / 转发快照', limit: '快照稀疏，不是连续时序' },
   { layer: '话题层', tables: 'weibo.topic / weibo.post_topic', usage: '话题聚合、详情', limit: '只代表显式携带话题的帖子' },
@@ -108,7 +108,7 @@ onMounted(async () => {
       <div><span>可用天数</span><strong>{{ meta.data_window.available_days }} 天</strong></div>
       <div><span>历史是否较短</span><strong>{{ meta.data_window.is_partial_history ? '是（< 30 天）' : '否' }}</strong></div>
       <div v-if="overview"><span>帖子数</span><strong>{{ formatLargeNumber(overview.post_count) }}</strong></div>
-      <div v-if="overview"><span>采样评论数</span><strong>{{ formatLargeNumber(overview.sampled_comment_count) }}</strong></div>
+      <div v-if="overview"><span>采集评论数</span><strong>{{ formatLargeNumber(overview.sampled_comment_count) }}</strong></div>
       <div v-if="overview"><span>累计互动（快照）</span><strong>{{ formatLargeNumber(overview.latest_interactions) }}</strong></div>
       <div v-if="overview"><span>活跃话题</span><strong>{{ formatLargeNumber(overview.active_topic_count) }}</strong></div>
     </div>
@@ -192,7 +192,10 @@ onMounted(async () => {
     <ul class="notices">
       <li>{{ dq.history_window_notice }}</li>
       <li>{{ dq.comment_sampling_notice }}</li>
+      <li>{{ dq.emotion_sample_notice }}</li>
       <li>{{ dq.engagement_notice }}</li>
+      <li>{{ dq.risk_score_notice }}</li>
+      <li>{{ dq.risk_factor_notice }}</li>
       <li>{{ dq.post_discovery_notice }}</li>
       <li>{{ dq.timezone_notice }}</li>
     </ul>

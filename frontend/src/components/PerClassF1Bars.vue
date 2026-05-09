@@ -21,7 +21,7 @@ function widthPct(n: number | undefined): number {
   <div class="per-class">
     <div class="head">
       <span class="lbl">类别</span>
-      <span class="biz">业务集 F1</span>
+      <span class="biz">业务留出 F1</span>
       <span class="smp">SMP 测试 F1</span>
     </div>
     <div v-for="label in EMOTION_ORDER" :key="label" class="row">

@@ -23,7 +23,7 @@ const kpis = computed<KpiCard[]>(() => {
   return [
     { label: '帖子数', value: formatLargeNumber(o?.post_count), sparkColor: '#4ade80', sparkPoints: totals },
     { label: '负面率', value: formatPercent(o?.negative_ratio), sparkColor: '#ff4d52', sparkPoints: negs },
-    { label: '采样评论', value: formatLargeNumber(o?.sampled_comment_count) },
+    { label: '采集评论', value: formatLargeNumber(o?.sampled_comment_count) },
     { label: '活跃话题', value: formatLargeNumber(o?.active_topic_count) },
     { label: '互动总量', value: formatLargeNumber(o?.latest_interactions) },
   ]

@@ -7,6 +7,7 @@ from datetime import timedelta, timezone
 NEGATIVE_LABELS = ('愤怒', '悲伤', '恐惧')
 NEGATIVE_LABEL_IDS = (1, 2, 3)
 ANGER_FEAR_LABEL_IDS = (1, 3)
+NEGATIVE_GROWTH_SMOOTHING = 5.0
 
 PRIMARY_MODEL_NAME = 'ERNIE mixed-v2'
 PRIMARY_MODEL_VERSION = 'ernie-usual-mixed-v2'
@@ -20,8 +21,11 @@ DISPLAY_TZ = timezone(timedelta(hours=8))  # Asia/Shanghai
 STABLE_DAY_THRESHOLD = 10000
 
 DATA_QUALITY_NOTICES = {
-    'comment_sampling_notice': '评论为采样集合，不代表全量评论分布。',
+    'comment_sampling_notice': '评论为当前 CK 已采集集合，不代表平台全量评论分布。',
     'engagement_notice': '互动数来自 post_engagement_ts 平台快照。',
+    'emotion_sample_notice': '话题情绪结构和负面率按 post/comment 预测样本行统计；评论覆盖范围以 CK 当前采集结果为准。',
+    'risk_score_notice': '风险分用于当前时间窗内话题排序和解释，部分因子采用候选话题 p95 归一化，不建议跨时间窗直接比较绝对分值。',
+    'risk_factor_notice': '风险分中的“互动增量”按窗口内帖子互动快照的绝对增量计算；详情页展示的“互动增长”为相对最早快照的比例。“KOL/认证信号”综合 KOL 入口、认证账号和高粉账号，不等同于唯一 KOL 人数。',
     'timezone_notice': '存储为 UTC，前端展示为东八区。',
     'history_window_notice': '当前爬虫仅有约 14 天稳定历史数据，趋势和风险分只按实际可用窗口解释。',
     'user_tier_notice': 'followers_count 等画像字段仅 profile_tier >= 1 可信。',
@@ -52,6 +56,6 @@ RISK_FACTOR_LABELS = {
     'negative_growth': '负面增长',
     'interaction_growth': '互动增量',
     'anger_fear': '愤怒/恐惧',
-    'kol_verified': 'KOL/认证',
-    'source_diversity': '入口扩散',
+    'kol_verified': 'KOL/认证信号',
+    'source_diversity': '入口覆盖',
 }

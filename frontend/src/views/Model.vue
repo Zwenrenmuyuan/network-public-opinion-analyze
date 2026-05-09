@@ -62,7 +62,7 @@ onMounted(async () => {
     <div class="reveal">
       <p class="page-eyebrow">SECTION IV / MODEL</p>
       <h1 class="page-title">模型<em>可解释</em></h1>
-      <p class="page-lead">主模型 ERNIE 在业务集 / SMP 测试集的指标，6×6 混淆矩阵，以及与对照模型 BERT 的一致率与高置信分歧样本。</p>
+      <p class="page-lead">主模型 ERNIE 在业务留出验证集 / SMP 测试集的指标，6×6 混淆矩阵，以及与对照模型 BERT 的一致率与高置信分歧样本。</p>
     </div>
     <div class="page-meta reveal" v-if="meta && quality">
       <div class="meta-line">
@@ -85,13 +85,14 @@ onMounted(async () => {
     </div>
     <div class="metric-grid">
       <div class="metric-card">
-        <p class="m-label">业务集 / business eval</p>
+        <p class="m-label">业务留出验证集 / held-out business eval</p>
         <div class="m-row" v-if="quality.business_eval">
           <div><span>accuracy</span><strong>{{ formatPercent(quality.business_eval.accuracy) }}</strong></div>
           <div><span>macro F1</span><strong>{{ formatPercent(quality.business_eval.macro_f1) }}</strong></div>
           <div><span>样本</span><strong>{{ formatLargeNumber(quality.business_eval.samples) }}</strong></div>
         </div>
-        <p v-else class="muted">无业务集报告</p>
+        <p v-if="quality.business_eval" class="metric-hint">该集合未参与 mixed-v2 训练，用于评估业务域泛化效果。</p>
+        <p v-else class="muted">无业务留出验证集报告</p>
       </div>
       <div class="metric-card">
         <p class="m-label">SMP 测试集 / smp test</p>
@@ -109,10 +110,10 @@ onMounted(async () => {
     <div class="section-head">
       <div>
         <p class="eyebrow">PER-CLASS / F1</p>
-        <h2 class="section-title">各类别 F1<em>business vs smp</em></h2>
+        <h2 class="section-title">各类别 F1<em>held-out business vs smp</em></h2>
       </div>
       <div class="legend">
-        <span><i class="solid"></i>业务集</span>
+        <span><i class="solid"></i>业务留出验证集</span>
         <span><i class="dashed"></i>SMP 测试</span>
       </div>
     </div>
@@ -292,6 +293,11 @@ section[class$="-section"] {
   color: var(--muted); line-height: 1.85;
 }
 .hint strong { color: var(--ink-2); font-weight: 500; }
+.metric-hint {
+  margin-top: 14px;
+  font-family: var(--sans-cn); font-size: 12px;
+  color: var(--muted); line-height: 1.7;
+}
 
 .agree-meta {
   display: flex; align-items: baseline; gap: 10px;

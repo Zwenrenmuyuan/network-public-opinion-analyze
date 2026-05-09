@@ -86,7 +86,7 @@ async function toggle(a: Actor) {
               <span class="chip emo" :style="{ background: EMOTION_COLORS[s.pred_label], color: '#0a0c10' }">
                 {{ s.pred_label }} · {{ (s.confidence * 100).toFixed(0) }}%
               </span>
-              <span v-if="s.source === 'comment'" class="chip warn">采样评论</span>
+              <span v-if="s.source === 'comment'" class="chip warn">采集评论</span>
               <span class="chip">互动 {{ s.interaction_count }}</span>
               <time class="ts">{{ formatDate(s.created_at) }}</time>
             </div>

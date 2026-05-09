@@ -11,6 +11,7 @@ from npo.config import LABELS_ZH
 from .cache import cached_endpoint
 from .config import (
     ANGER_FEAR_LABEL_IDS,
+    NEGATIVE_GROWTH_SMOOTHING,
     NEGATIVE_LABEL_IDS,
     PRIMARY_MODEL_VERSION,
     RISK_FACTOR_LABELS,
@@ -220,7 +221,7 @@ def add_risk_raw_values(item: dict) -> None:
     item['anger_fear_ratio_raw'] = ratio(item.get('anger_fear_count', 0), total)
     item['negative_growth_raw'] = ratio(
         item.get('recent_negative_count', 0) - item.get('previous_negative_count', 0),
-        max(item.get('previous_negative_count', 0), 1),
+        item.get('previous_negative_count', 0) + NEGATIVE_GROWTH_SMOOTHING,
     )
     item['interaction_growth_raw'] = to_float(item.get('interaction_delta'))
     item['interaction_growth_ratio'] = ratio(
@@ -343,7 +344,7 @@ def _render_topic(tid: int, by_topic: dict[int, dict], metrics: dict[int, dict],
         'risk_factor_labels': RISK_FACTOR_LABELS,
         'note': (
             f"负面率 {item['negative_ratio_raw'] * 100:.1f}%，主导情绪为{dominant_emotion}；"
-            f"风险分由情绪结构、互动增量和 KOL/认证参与共同驱动。"
+            f"风险分由情绪结构、互动增量和 KOL/认证信号共同驱动。"
         ),
     }
 

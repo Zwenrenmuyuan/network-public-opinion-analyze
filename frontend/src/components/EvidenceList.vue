@@ -83,7 +83,7 @@ watch(() => [props.range, props.topicId] as const, () => loadFirst(), { immediat
           class="chip emo"
           :style="{ background: EMOTION_COLORS[s.pred_label], color: '#0a0c10' }"
         >{{ s.pred_label }} · {{ (s.confidence * 100).toFixed(0) }}%</span>
-        <span v-if="s.source === 'comment'" class="chip warn">采样评论</span>
+        <span v-if="s.source === 'comment'" class="chip warn">采集评论</span>
         <span class="chip">互动 {{ s.interaction_count }}</span>
         <span class="chip">{{ s.evidence_reason }}</span>
         <time class="ts">{{ formatDate(s.created_at) }}</time>

@@ -234,13 +234,41 @@ def _topic_engagement(ck, window: dict, topic_id: int) -> tuple[list[dict], dict
         }
         for row in rows
     ]
-    earliest = curve[0]['interaction_count'] if curve else 0
-    latest = curve[-1]['interaction_count'] if curve else 0
-    return curve, {
+    return curve, _topic_engagement_summary(ck, window, topic_id)
+
+
+def _topic_engagement_summary(ck, window: dict, topic_id: int) -> dict:
+    row = ck.query_one(f"""
+        SELECT
+          sum(e.earliest_interactions) AS earliest_interactions,
+          sum(e.latest_interactions) AS latest_interactions,
+          sum(greatest(e.latest_interactions - e.earliest_interactions, 0)) AS interaction_delta
+        FROM weibo.post_topic AS pt
+        INNER JOIN (
+          SELECT
+            post_id,
+            argMin(comments_count + attitudes_count + reposts_count, captured_at) AS earliest_interactions,
+            argMax(comments_count + attitudes_count + reposts_count, captured_at) AS latest_interactions
+          FROM weibo.post_engagement_ts
+          WHERE captured_at >= '{window['start_utc_str']}'
+            AND captured_at <= '{window['end_utc_str']}'
+            AND post_id IN (
+              SELECT DISTINCT post_id
+              FROM weibo.post_topic
+              WHERE topic_id = {topic_id}
+            )
+          GROUP BY post_id
+        ) AS e ON e.post_id = pt.post_id
+        WHERE pt.topic_id = {topic_id}
+    """) or {}
+    earliest = to_float(row.get('earliest_interactions'))
+    latest = to_float(row.get('latest_interactions'))
+    delta = to_float(row.get('interaction_delta'))
+    return {
         'earliest_interactions': earliest,
         'latest_interactions': latest,
-        'interaction_delta': max(latest - earliest, 0),
-        'interaction_growth': round(ratio(max(latest - earliest, 0), max(earliest, 1)), 4),
+        'interaction_delta': delta,
+        'interaction_growth': round(ratio(delta, max(earliest, 1)), 4),
     }
 
 

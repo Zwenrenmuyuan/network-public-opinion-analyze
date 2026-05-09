@@ -154,6 +154,9 @@ export interface EvidenceResponse {
 export interface DataQualityResponse {
   comment_sampling_notice: string
   engagement_notice: string
+  emotion_sample_notice: string
+  risk_score_notice: string
+  risk_factor_notice: string
   timezone_notice: string
   history_window_notice: string
   user_tier_notice: string

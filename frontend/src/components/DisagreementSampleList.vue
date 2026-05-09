@@ -23,7 +23,7 @@ defineProps<{ samples: DisagreementSample[] }>()
           <span class="conf">{{ s.bert_confidence != null ? (s.bert_confidence * 100).toFixed(0) + '%' : '—' }}</span>
         </div>
         <div class="meta">
-          <span v-if="s.source === 'comment'" class="chip warn">采样评论</span>
+          <span v-if="s.source === 'comment'" class="chip warn">采集评论</span>
           <span v-else class="chip">原帖</span>
           <time class="ts">{{ formatDate(s.created_at) }}</time>
         </div>

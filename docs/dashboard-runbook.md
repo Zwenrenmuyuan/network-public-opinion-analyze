@@ -73,7 +73,7 @@ http://localhost:8000/
 - 主模型 checkpoint：`runs/ernie-usual-mixed-v2/best`。
 - 情绪标签顺序以 `src/npo/config.py:LABELS_ZH` 为准。
 - 负面情绪定义：`愤怒 + 悲伤 + 恐惧`。
-- `comment` 是采样评论，不代表平台全量评论。
+- `comment` 是当前 CK 已采集评论，不代表平台全量评论。
 - 互动数来自 `weibo.post_engagement_ts` 平台快照。
 - CK 时间字段按 UTC 存储，前端展示为东八区。
 - `topic_id`、`post_id`、`comment_id` 返回前端时按字符串处理。
@@ -107,7 +107,7 @@ GET /api/dashboard/model-quality
 - 时间范围切换后各模块刷新。
 - 点击风险话题后详情、证据、关键账号和矩阵刷新。
 - 浏览器 console 无 JavaScript 错误。
-- 评论相关文案标注“采样评论”。
+- 评论相关文案标注“采集评论”或“当前 CK 已采集评论”。
 - API 单模块失败时页面其他模块不应崩溃。
 
 ## 6. 生产部署考虑

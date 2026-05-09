@@ -37,7 +37,7 @@
 明确不做：
 
 - 不做完整社交传播网络图。当前只有单级 `retweet_of` 和 `post_discovery` 入口。
-- 不把 `comment` 表解释为全量评论民意。评论是采样数据。
+- 不把 `comment` 表解释为全量评论民意。评论是当前 CK 已采集数据。
 - 不做独立用户画像系统。用户/KOL 只用于舆情解释。
 - 不让前端直连 CK、不暴露 SQL、不暴露 CK 凭据。
 - 不提交真实业务数据、导出数据、模型权重、`.env`。
@@ -86,7 +86,7 @@ ClickHouse weibo.* 原始表
 
 | 层 | 表 | 用途 | 口径限制 |
 |---|---|---|---|
-| 内容层 | `weibo.post`, `weibo.comment` | 原文、证据流、预测输入 | `comment` 是采样评论，不代表全量评论。 |
+| 内容层 | `weibo.post`, `weibo.comment` | 原文、证据流、预测输入 | `comment` 是当前 CK 已采集评论，不代表平台全量评论。 |
 | 情绪层 | `dashboard.sentiment_prediction` | 六分类预测、置信度、BERT 对照 | 查询必须过滤 `model_version`。 |
 | 热度层 | `weibo.post_engagement_ts` | 点赞/评论/转发快照 | 快照稀疏，不是连续时间序列。 |
 | 话题层 | `weibo.topic`, `weibo.post_topic` | 话题聚合、详情页 | 只代表显式携带话题的帖子。 |
@@ -207,7 +207,7 @@ source_type + source_id + model_version
 - `top_actors`：话题内关键账号。
 - `evidence_samples`：话题内证据样本。
 
-详情接口风险分用于解释当前话题，不应与榜单重新严格排序。
+详情接口复用风险话题榜公式和窗口候选 p95 归一化，同一窗口内同一话题的详情分应与榜单分一致。
 
 ### 7.4 `actors`
 
@@ -255,7 +255,7 @@ source_type + source_id + model_version
 - `actor_role`
 - `evidence_reason`
 
-评论证据必须标注为“采样评论”。
+评论证据必须标注为“采集评论”。
 
 ## 8. 派生指标
 
@@ -279,18 +279,24 @@ interaction_growth_rate = interaction_delta / max(earliest_interactions_in_windo
 
 ### 8.2 风险分
 
-风险分服务于排序和解释，不是绝对真值。
+风险分服务于排序和解释，不是绝对真值。风险分用于当前时间窗内话题排序和解释，
+部分因子采用候选话题 p95 归一化，不建议跨时间窗直接比较绝对分值。
 
 ```text
 risk_score = 100 * (
-  0.25 * negative_ratio
-+ 0.20 * negative_growth_score
-+ 0.20 * interaction_growth_score
-+ 0.15 * anger_fear_ratio
-+ 0.10 * kol_verified_score
-+ 0.10 * source_diversity_score
+    0.25 * negative_ratio
+  + 0.20 * negative_growth_score
+  + 0.20 * interaction_growth_score
+  + 0.15 * anger_fear_ratio
+  + 0.10 * kol_verified_score
+  + 0.10 * source_coverage_score
 )
 ```
+
+- `negative_growth_score`：前后半窗负面样本变化率，分母使用 `previous_negative_count + 5` 做平滑。
+- `interaction_growth_score`：按窗口内帖子互动快照的绝对增量做候选话题 p95 归一化；详情页展示的“互动增长”为相对最早快照的比例。
+- `kol_verified_score`：综合 KOL 入口、认证账号和高粉账号信号，不等同于唯一 KOL 人数。
+- `source_coverage_score`：发现入口覆盖度，当前入口包括 hot / keyword / kol / retweet。
 
 风险等级：
 
@@ -337,7 +343,7 @@ KOL 分三类解释：
 - 只请求 `/api/dashboard/*`。
 - 不配置 CK 地址、账号、密码或本地数据路径。
 - `topic_id` 始终按字符串处理。
-- 评论相关文案必须出现“采样评论”。
+- 评论相关文案必须出现“采集评论”或“当前 CK 已采集评论”。
 - ECharts CDN 不可用时页面不能白屏。
 - API 失败只影响对应模块，不能导致整页崩溃。
 
@@ -377,7 +383,7 @@ GET /api/dashboard/evidence?range=all_available&topic_id={topic_id}&limit=3
 - 切换三个时间范围，确认各模块刷新。
 - 点击多个风险话题，确认详情、证据、账号和矩阵刷新。
 - 浏览器 console 无 JS 错误。
-- 页面中评论口径显示为“采样评论”。
+- 页面中评论口径显示为“采集评论”或“当前 CK 已采集评论”。
 
 ## 11. 后续待办
 
