@@ -9,6 +9,7 @@ from flask import Blueprint, abort, jsonify
 from npo.config import LABELS_ZH
 
 from .actors import actor_summary
+from .cache import cached_endpoint
 from .config import (
     ANGER_FEAR_LABEL_IDS,
     EVIDENCE_DEFAULT_LIMIT,
@@ -25,6 +26,7 @@ from .utils import format_growth, limit_arg, ratio, resolve_window, risk_level, 
 
 def register_topic_routes(api: Blueprint, ck) -> None:
     @api.route('/topics/<int:topic_id>')
+    @cached_endpoint('topic-detail')
     def api_topic_detail(topic_id: int):
         detail = topic_detail(
             ck,

@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify
 
 from npo.config import LABELS_ZH
 
+from .cache import cached_endpoint
 from .config import (
     BERT_USAGE,
     DISAGREEMENT_DEFAULT_LIMIT,
@@ -29,6 +30,7 @@ from .utils import display_text, limit_arg, ratio, round_float, to_int, utc_to_c
 
 def register_disagreement_routes(api: Blueprint, ck) -> None:
     @api.route('/model-disagreement')
+    @cached_endpoint('model-disagreement')
     def api_model_disagreement():
         limit = limit_arg('limit', DISAGREEMENT_DEFAULT_LIMIT, DISAGREEMENT_MAX_LIMIT)
         return jsonify(model_disagreement(ck, limit))

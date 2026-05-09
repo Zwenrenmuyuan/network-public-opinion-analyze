@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify
 
 from npo.config import LABELS_ZH
 
+from .cache import cached_endpoint
 from .config import (
     ANGER_FEAR_LABEL_IDS,
     DATA_QUALITY_NOTICES,
@@ -62,6 +63,7 @@ def register_summary_routes(api: Blueprint, ck) -> None:
         })
 
     @api.route('/overview')
+    @cached_endpoint('overview')
     def api_overview():
         w = resolve_window(ck)
         s = w['start_utc_str']
@@ -113,6 +115,7 @@ def register_summary_routes(api: Blueprint, ck) -> None:
         })
 
     @api.route('/emotion-timeseries')
+    @cached_endpoint('emotion-timeseries')
     def api_emotion_timeseries():
         w = resolve_window(ck)
         rows = ck.query_json(f"""

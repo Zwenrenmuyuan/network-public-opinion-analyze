@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify
 
 from npo.config import LABELS_ZH
 
+from .cache import cached_endpoint
 from .config import (
     ACTOR_CANDIDATE_LIMIT,
     ACTOR_DEFAULT_LIMIT,
@@ -24,6 +25,7 @@ from .utils import limit_arg, ratio, resolve_window, to_int, topic_id_arg
 
 def register_actor_routes(api: Blueprint, ck) -> None:
     @api.route('/actors')
+    @cached_endpoint('actors')
     def api_actors():
         return jsonify(actor_summary(
             ck,
@@ -33,6 +35,7 @@ def register_actor_routes(api: Blueprint, ck) -> None:
         ))
 
     @api.route('/influence-emotion')
+    @cached_endpoint('influence-emotion')
     def api_influence_emotion():
         actors = actor_summary(
             ck,

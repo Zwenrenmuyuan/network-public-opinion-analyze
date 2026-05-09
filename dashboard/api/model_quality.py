@@ -8,12 +8,14 @@ from flask import Blueprint, jsonify
 
 from npo.config import LABELS_ZH
 
+from .cache import cached_endpoint
 from .config import BERT_USAGE, PRIMARY_CHECKPOINT, PRIMARY_MODEL_NAME, SECONDARY_MODEL_NAME
 from .utils import extract_eval, load_json, top_confusions
 
 
 def register_model_quality_routes(api: Blueprint, project_root: Path) -> None:
     @api.route('/model-quality')
+    @cached_endpoint('model-quality')
     def api_model_quality():
         sources = _model_quality_sources(project_root)
         business = load_json(sources['business_eval'])

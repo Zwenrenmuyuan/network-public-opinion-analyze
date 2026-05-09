@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify
 
 from npo.config import LABELS_ZH
 
+from .cache import cached_endpoint
 from .config import (
     ANGER_FEAR_LABEL_IDS,
     NEGATIVE_LABEL_IDS,
@@ -22,6 +23,7 @@ from .utils import format_growth, limit_arg, norm, p95, ratio, resolve_window, r
 
 def register_risk_routes(api: Blueprint, ck) -> None:
     @api.route('/risk-topics')
+    @cached_endpoint('risk-topics')
     def api_risk_topics():
         limit = limit_arg('limit', RISK_TOPIC_DEFAULT_LIMIT, RISK_TOPIC_DEFAULT_LIMIT)
         return jsonify(build_risk_topics(ck, resolve_window(ck), limit))
