@@ -48,6 +48,8 @@ const state = {
   dataQuality: null,
   modelQuality: null,
   disagreement: null,
+  topicQuery: "",
+  evidenceQuery: "",
 };
 
 // 请求序号防御：切换 range / topic 时分别 +1。异步返回时校对序号，
@@ -885,7 +887,8 @@ async function loadTrend(token) {
 async function loadRiskTopics(token) {
   el("#topicList").innerHTML = '<p class="muted">正在加载风险话题...</p>';
   try {
-    const rows = await fetchJSON(`/api/dashboard/risk-topics?${rangeQS()}&limit=20`);
+    const q = state.topicQuery ? `&q=${encodeURIComponent(state.topicQuery)}` : "";
+    const rows = await fetchJSON(`/api/dashboard/risk-topics?${rangeQS()}&limit=20${q}`);
     if (token !== tokens.range) return;
     state.topics = rows || [];
     const stillExists = state.topics.find((t) => String(t.topic_id) === String(state.selectedTopicId));
@@ -932,7 +935,8 @@ async function loadTopicDetail(token) {
 async function loadEvidence(token) {
   el("#evidenceList").innerHTML = '<p class="muted">正在加载证据样本（采样评论）...</p>';
   try {
-    const rows = await fetchJSON(`/api/dashboard/evidence?${withTopic(rangeQS())}&limit=8`);
+    const q = state.evidenceQuery ? `&q=${encodeURIComponent(state.evidenceQuery)}` : "";
+    const rows = await fetchJSON(`/api/dashboard/evidence?${withTopic(rangeQS())}&limit=8${q}`);
     if (token !== tokens.topic) return;
     renderEvidence(rows);
   } catch (err) {
@@ -994,11 +998,51 @@ function reloadTopicScopedData() {
 // ===========================================================================
 // Bootstrap
 // ===========================================================================
+function setupSearchInputs() {
+  const topicInput = el("#topicSearchInput");
+  if (topicInput) {
+    topicInput.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const next = topicInput.value.trim();
+      if (next === state.topicQuery) return;
+      state.topicQuery = next;
+      reloadRangeScopedData();
+    });
+    // type="search" 内置 ✕ 触发 search 事件，value 已经被清空
+    topicInput.addEventListener("search", () => {
+      const next = topicInput.value.trim();
+      if (next === state.topicQuery) return;
+      state.topicQuery = next;
+      reloadRangeScopedData();
+    });
+  }
+
+  const evInput = el("#evidenceSearchInput");
+  if (evInput) {
+    evInput.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const next = evInput.value.trim();
+      if (next === state.evidenceQuery) return;
+      state.evidenceQuery = next;
+      tokens.topic += 1;
+      loadEvidence(tokens.topic);
+    });
+    evInput.addEventListener("search", () => {
+      const next = evInput.value.trim();
+      if (next === state.evidenceQuery) return;
+      state.evidenceQuery = next;
+      tokens.topic += 1;
+      loadEvidence(tokens.topic);
+    });
+  }
+}
+
 async function bootstrap() {
   renderLegend();
   renderRangeTabs();
   renderTopicDetail();
   renderEvidence([]);
+  setupSearchInputs();
 
   await loadMeta();
   // 与 range 无关，独立并行

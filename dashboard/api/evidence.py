@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify
 
 from .config import ANGER_FEAR_LABEL_IDS, EVIDENCE_DEFAULT_LIMIT, EVIDENCE_MAX_LIMIT, LOW_MARGIN_THRESHOLD, NEGATIVE_LABEL_IDS, PRIMARY_MODEL_VERSION
-from .utils import display_text, limit_arg, resolve_window, round_float, to_float, to_int, topic_id_arg, utc_to_cst_iso
+from .utils import display_text, limit_arg, q_arg, resolve_window, round_float, to_float, to_int, topic_id_arg, utc_to_cst_iso
 
 
 def register_evidence_routes(api: Blueprint, ck) -> None:
@@ -16,14 +16,15 @@ def register_evidence_routes(api: Blueprint, ck) -> None:
             resolve_window(ck),
             topic_id_arg(),
             limit_arg('limit', EVIDENCE_DEFAULT_LIMIT, EVIDENCE_MAX_LIMIT),
+            q_arg(),
         ))
 
 
-def evidence_samples(ck, window: dict, topic_id: int | None, limit: int) -> list[dict]:
+def evidence_samples(ck, window: dict, topic_id: int | None, limit: int, q: str = '') -> list[dict]:
     topic_filter = '' if topic_id is None else f'AND pt.topic_id = {topic_id}'
     start = window['start_utc_str']
     end = window['end_utc_str']
-    rows = ck.query_json(_evidence_sql(start, end, topic_filter, limit))
+    rows = ck.query_json(_evidence_sql(start, end, topic_filter, q, limit))
     out = []
     for idx, row in enumerate(rows, 1):
         reason_parts = [row['pred_label']]
@@ -52,7 +53,9 @@ def evidence_samples(ck, window: dict, topic_id: int | None, limit: int) -> list
     return out
 
 
-def _evidence_sql(start: str, end: str, topic_filter: str, limit: int) -> str:
+def _evidence_sql(start: str, end: str, topic_filter: str, q: str, limit: int) -> str:
+    q_filter_post = f"AND positionCaseInsensitive(p.text_raw, '{q}') > 0" if q else ''
+    q_filter_comment = f"AND positionCaseInsensitive(c.text_raw, '{q}') > 0" if q else ''
     score_expr = f"""
       if(sp.pred_label_id IN {ANGER_FEAR_LABEL_IDS}, 30, if(sp.pred_label_id IN {NEGATIVE_LABEL_IDS}, 20, 0))
       + sp.confidence * 20
@@ -110,6 +113,7 @@ def _evidence_sql(start: str, end: str, topic_filter: str, limit: int) -> str:
           {engagement_join}
           WHERE {where_common}
             AND sp.source_type = 'post'
+            {q_filter_post}
           GROUP BY
             sp.source_type, sp.source_id, sp.post_id, sp.source_created_at, p.text_raw,
             sp.pred_label, sp.pred_label_id, sp.confidence, sp.second_label, sp.margin,
@@ -138,6 +142,7 @@ def _evidence_sql(start: str, end: str, topic_filter: str, limit: int) -> str:
           {engagement_join}
           WHERE {where_common}
             AND sp.source_type = 'comment'
+            {q_filter_comment}
           GROUP BY
             sp.source_type, sp.source_id, sp.post_id, sp.source_created_at, c.text_raw,
             sp.pred_label, sp.pred_label_id, sp.confidence, sp.second_label, sp.margin,

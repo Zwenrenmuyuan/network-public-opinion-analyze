@@ -18,7 +18,7 @@ from .config import (
     RISK_TOPIC_DEFAULT_LIMIT,
     SOURCE_TYPES,
 )
-from .utils import format_growth, limit_arg, norm, p95, ratio, resolve_window, risk_level, to_float, to_int
+from .utils import format_growth, limit_arg, norm, p95, q_arg, ratio, resolve_window, risk_level, to_float, to_int
 
 
 def register_risk_routes(api: Blueprint, ck) -> None:
@@ -26,14 +26,21 @@ def register_risk_routes(api: Blueprint, ck) -> None:
     @cached_endpoint('risk-topics')
     def api_risk_topics():
         limit = limit_arg('limit', RISK_TOPIC_DEFAULT_LIMIT, RISK_TOPIC_DEFAULT_LIMIT)
-        return jsonify(build_risk_topics(ck, resolve_window(ck), limit))
+        return jsonify(build_risk_topics(ck, resolve_window(ck), limit, q_arg()))
 
 
-def build_risk_topics(ck, window: dict, limit: int) -> list[dict]:
+def build_risk_topics(ck, window: dict, limit: int, q: str = '') -> list[dict]:
     start = window['start_utc_str']
     end = window['end_utc_str']
     midpoint = (window['start_cst'] + (window['end_cst'] - window['start_cst']) / 2)
     midpoint_utc_str = midpoint.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+    title_filter = ''
+    if q:
+        title_filter = (
+            f"AND (positionCaseInsensitive(t.title, '{q}') > 0 "
+            f"OR positionCaseInsensitive(t.lead, '{q}') > 0)"
+        )
 
     candidates = ck.query_json(f"""
         SELECT
@@ -50,6 +57,7 @@ def build_risk_topics(ck, window: dict, limit: int) -> list[dict]:
             AND source_created_at >= '{start}'
             AND source_created_at <= '{end}'
         )
+        {title_filter}
         GROUP BY pt.topic_id
         HAVING post_count >= 3
         ORDER BY post_count DESC

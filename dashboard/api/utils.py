@@ -92,6 +92,20 @@ def topic_id_arg() -> int | None:
     return value if value > 0 else None
 
 
+def q_arg(name: str = 'q', max_length: int = 100) -> str:
+    """读取关键字搜索参数，trim + 截断 + 单引号 SQL 转义。
+
+    返回值已经按 CK 标准 `''` 转义过，可直接拼到 `'{q}'` 字面量里。
+    空字符串表示用户未传 q（调用方应跳过 WHERE 过滤）。
+    """
+    raw = request.args.get(name, '').strip()
+    if not raw:
+        return ''
+    if len(raw) > max_length:
+        raw = raw[:max_length]
+    return raw.replace("'", "''")
+
+
 def to_float(value, default: float = 0.0) -> float:
     if value is None:
         return default
