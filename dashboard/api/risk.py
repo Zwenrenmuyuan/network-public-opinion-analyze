@@ -213,27 +213,95 @@ def _add_actor_signals(ck, metrics: dict[int, dict], ids_sql: str, start: str, e
         item['high_follower_actor_count'] = to_int(row.get('high_follower_actor_count'))
 
 
+def add_risk_raw_values(item: dict) -> None:
+    """对单个 metrics item 添加 *_raw 字段（in-place）。topics.py 也调用。"""
+    total = item.get('sample_count', 0)
+    item['negative_ratio_raw'] = ratio(item.get('negative_count', 0), total)
+    item['anger_fear_ratio_raw'] = ratio(item.get('anger_fear_count', 0), total)
+    item['negative_growth_raw'] = ratio(
+        item.get('recent_negative_count', 0) - item.get('previous_negative_count', 0),
+        max(item.get('previous_negative_count', 0), 1),
+    )
+    item['interaction_growth_raw'] = to_float(item.get('interaction_delta'))
+    item['interaction_growth_ratio'] = ratio(
+        item.get('interaction_delta', 0.0),
+        max(item.get('earliest_interactions', 0.0), 1.0),
+    )
+    item['kol_verified_raw'] = (
+        item.get('kol_entry_count', 0)
+        + item.get('verified_actor_count', 0)
+        + item.get('high_follower_actor_count', 0)
+    )
+    source_counts = item.get('source_counts', {})
+    item['source_diversity_raw'] = ratio(
+        len([s for s in SOURCE_TYPES if source_counts.get(s, 0) > 0]),
+        len(SOURCE_TYPES),
+    )
+
+
 def _add_risk_raw_values(metrics: dict[int, dict]) -> None:
     for item in metrics.values():
-        total = item.get('sample_count', 0)
-        item['negative_ratio_raw'] = ratio(item.get('negative_count', 0), total)
-        item['anger_fear_ratio_raw'] = ratio(item.get('anger_fear_count', 0), total)
-        item['negative_growth_raw'] = ratio(
-            item.get('recent_negative_count', 0) - item.get('previous_negative_count', 0),
-            max(item.get('previous_negative_count', 0), 1),
+        add_risk_raw_values(item)
+
+
+def compute_window_caps(ck, window: dict) -> dict[str, float]:
+    """跑窗口候选话题集合 → metrics → raw values → 算 p95 caps。
+
+    topic-detail 接口复用这个 caps 给单话题打分，保证列表分 == 详情分。
+    """
+    start = window['start_utc_str']
+    end = window['end_utc_str']
+    midpoint = (window['start_cst'] + (window['end_cst'] - window['start_cst']) / 2)
+    midpoint_utc_str = midpoint.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+    candidates = ck.query_json(f"""
+        SELECT pt.topic_id AS topic_id
+        FROM weibo.post_topic AS pt
+        INNER JOIN weibo.topic AS t ON t.topic_id = pt.topic_id
+        WHERE pt.post_id IN (
+          SELECT DISTINCT post_id
+          FROM dashboard.sentiment_prediction
+          WHERE model_version = '{PRIMARY_MODEL_VERSION}'
+            AND source_created_at >= '{start}'
+            AND source_created_at <= '{end}'
         )
-        item['interaction_growth_raw'] = to_float(item.get('interaction_delta'))
-        item['interaction_growth_ratio'] = ratio(
-            item.get('interaction_delta', 0.0),
-            max(item.get('earliest_interactions', 0.0), 1.0),
-        )
-        item['kol_verified_raw'] = (
-            item.get('kol_entry_count', 0)
-            + item.get('verified_actor_count', 0)
-            + item.get('high_follower_actor_count', 0)
-        )
-        source_counts = item.get('source_counts', {})
-        item['source_diversity_raw'] = ratio(len([s for s in SOURCE_TYPES if source_counts.get(s, 0) > 0]), len(SOURCE_TYPES))
+        GROUP BY pt.topic_id
+        HAVING count(DISTINCT pt.post_id) >= 3
+        ORDER BY count(DISTINCT pt.post_id) DESC
+        LIMIT {RISK_TOPIC_CANDIDATE_LIMIT}
+    """)
+    if not candidates:
+        return {'negative_growth': 1.0, 'interaction_growth': 1.0, 'kol_verified': 1.0}
+
+    candidate_ids = [to_int(r['topic_id']) for r in candidates]
+    ids_sql = ','.join(str(x) for x in candidate_ids)
+    metrics = _collect_topic_metrics(ck, candidate_ids, ids_sql, start, end, midpoint_utc_str)
+    _add_risk_raw_values(metrics)
+    return {
+        'negative_growth': p95([x['negative_growth_raw'] for x in metrics.values()]),
+        'interaction_growth': p95([x['interaction_growth_raw'] for x in metrics.values()]),
+        'kol_verified': p95([x['kol_verified_raw'] for x in metrics.values()]),
+    }
+
+
+def risk_factor_points(item: dict, caps: dict[str, float]) -> dict[str, float]:
+    """权重公式（公开版）。topics.py 也调用，保证两边公式完全一致。"""
+    factors_norm = {
+        'negative_ratio': item['negative_ratio_raw'],
+        'negative_growth': norm(item['negative_growth_raw'], caps['negative_growth']),
+        'interaction_growth': norm(item['interaction_growth_raw'], caps['interaction_growth']),
+        'anger_fear': item['anger_fear_ratio_raw'],
+        'kol_verified': norm(item['kol_verified_raw'], caps['kol_verified']),
+        'source_diversity': item['source_diversity_raw'],
+    }
+    return {
+        'negative_ratio': 100 * 0.25 * factors_norm['negative_ratio'],
+        'negative_growth': 100 * 0.20 * factors_norm['negative_growth'],
+        'interaction_growth': 100 * 0.20 * factors_norm['interaction_growth'],
+        'anger_fear': 100 * 0.15 * factors_norm['anger_fear'],
+        'kol_verified': 100 * 0.10 * factors_norm['kol_verified'],
+        'source_diversity': 100 * 0.10 * factors_norm['source_diversity'],
+    }
 
 
 def _render_topic(tid: int, by_topic: dict[int, dict], metrics: dict[int, dict], caps: dict[str, float]) -> dict | None:
@@ -250,7 +318,7 @@ def _render_topic(tid: int, by_topic: dict[int, dict], metrics: dict[int, dict],
         for name in SOURCE_TYPES
     } if source_total else {name: 0.0 for name in SOURCE_TYPES}
     dominant_emotion = max(item['emotion_counts'].items(), key=lambda kv: kv[1])[0]
-    factor_points = _risk_factor_points(item, caps)
+    factor_points = risk_factor_points(item, caps)
     score = round(sum(factor_points.values()), 1)
     return {
         **topic,
@@ -279,21 +347,3 @@ def _render_topic(tid: int, by_topic: dict[int, dict], metrics: dict[int, dict],
         ),
     }
 
-
-def _risk_factor_points(item: dict, caps: dict[str, float]) -> dict[str, float]:
-    factors_norm = {
-        'negative_ratio': item['negative_ratio_raw'],
-        'negative_growth': norm(item['negative_growth_raw'], caps['negative_growth']),
-        'interaction_growth': norm(item['interaction_growth_raw'], caps['interaction_growth']),
-        'anger_fear': item['anger_fear_ratio_raw'],
-        'kol_verified': norm(item['kol_verified_raw'], caps['kol_verified']),
-        'source_diversity': item['source_diversity_raw'],
-    }
-    return {
-        'negative_ratio': 100 * 0.25 * factors_norm['negative_ratio'],
-        'negative_growth': 100 * 0.20 * factors_norm['negative_growth'],
-        'interaction_growth': 100 * 0.20 * factors_norm['interaction_growth'],
-        'anger_fear': 100 * 0.15 * factors_norm['anger_fear'],
-        'kol_verified': 100 * 0.10 * factors_norm['kol_verified'],
-        'source_diversity': 100 * 0.10 * factors_norm['source_diversity'],
-    }

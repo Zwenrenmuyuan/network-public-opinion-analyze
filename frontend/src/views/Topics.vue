@@ -12,9 +12,10 @@ import TopicEngagementChart from '@/components/TopicEngagementChart.vue'
 import TopicSourceMix from '@/components/TopicSourceMix.vue'
 import ActorList from '@/components/ActorList.vue'
 import EvidenceList from '@/components/EvidenceList.vue'
+import InfluenceScatter from '@/components/InfluenceScatter.vue'
 import { EMOTION_COLORS, EMOTION_ORDER } from '@/api/echarts-theme'
 import { formatLargeNumber } from '@/utils/format'
-import type { RangeKey, RiskTopic, TopicDetailResponse } from '@/types/api'
+import type { InfluenceEmotionPoint, RangeKey, RiskTopic, TopicDetailResponse } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,7 @@ const { data: meta, range } = storeToRefs(metaStore)
 
 const topics = ref<RiskTopic[]>([])
 const detail = ref<TopicDetailResponse | null>(null)
+const scatter = ref<InfluenceEmotionPoint[]>([])
 const loadingList = ref(false)
 const loadingDetail = ref(false)
 const errorMsg = ref('')
@@ -43,11 +45,17 @@ async function loadList() {
 async function loadDetail(id: string) {
   loadingDetail.value = true
   detail.value = null
+  scatter.value = []
   errorMsg.value = ''
   try {
-    detail.value = await api.topicDetail(id, range.value, { limit: 6, actorLimit: 6 })
-  } catch (e) {
-    errorMsg.value = (e as Error).message
+    const [detailR, scatterR] = await Promise.allSettled([
+      api.topicDetail(id, range.value, { limit: 6, actorLimit: 6 }),
+      api.influenceEmotion(range.value, 200, id),
+    ])
+    if (detailR.status === 'fulfilled') detail.value = detailR.value
+    if (scatterR.status === 'fulfilled') scatter.value = scatterR.value
+    const failed = [detailR, scatterR].filter((r) => r.status === 'rejected') as PromiseRejectedResult[]
+    if (failed.length) errorMsg.value = failed.map((f) => String(f.reason)).join(' / ')
   } finally {
     loadingDetail.value = false
   }
@@ -184,6 +192,22 @@ watch(selectedId, (id) => { if (id) loadDetail(id) })
             <h3 class="block-title"><span class="eyebrow">DISCOVERY / SOURCE</span>入口结构</h3>
             <TopicSourceMix :counts="detail.source_counts" />
           </div>
+        </div>
+
+        <div class="actor-block reveal">
+          <h3 class="block-title"><span class="eyebrow">KOL × EMOTION</span>影响力 × 负面率</h3>
+          <div class="scatter-card">
+            <InfluenceScatter
+              :data="scatter"
+              :height="400"
+              :reference-y="detail.topic.negative_ratio"
+              reference-label="话题整体负面率"
+            />
+          </div>
+          <p class="scatter-hint">
+            横轴 = 该账号在<strong>本话题内</strong>的影响力分；纵轴 = 在本话题样本里的负面率；点尺寸 = 互动量；颜色 = 主导情绪。
+            琥珀虚线 = 本话题整体负面率，<strong>大圈在线上方</strong> → KOL 比一般用户更负面，可能在带节奏；<strong>大圈在线下方</strong> → KOL 较克制，话题负面由普通用户驱动。
+          </p>
         </div>
 
         <div class="actor-block reveal">
@@ -395,6 +419,19 @@ watch(selectedId, (id) => { if (id) loadDetail(id) })
   padding: 22px 18px 14px;
   background: rgba(255,255,255,0.012);
 }
+
+.scatter-card {
+  border: 1px solid var(--line);
+  padding: 18px 14px 6px;
+  background: rgba(255,255,255,0.012);
+}
+.scatter-hint {
+  margin-top: 14px;
+  font-size: 12px; line-height: 1.85;
+  color: var(--muted);
+  max-width: 760px;
+}
+.scatter-hint strong { color: var(--ink-2); font-weight: 500; }
 
 .loading, .error { font-family: var(--mono); font-size: 12px; padding: 40px 0; }
 .error { color: var(--alert); }

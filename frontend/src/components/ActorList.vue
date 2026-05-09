@@ -13,11 +13,13 @@ const props = defineProps<{
 }>()
 
 const ROLE_LABEL: Record<string, string> = {
+  entry_kol: '入口 KOL',
   verified_actor: '认证',
   high_follower_actor: '高粉',
-  negative_actor: '负面活跃',
-  active_actor: '活跃',
-  event_key_actor: '事件关键',
+  high_interaction: '高互动',
+  negative_polarized: '负面极化',
+  active_voice: '活跃发言',
+  cross_topic: '跨话题',
   ordinary_actor: '普通',
 }
 

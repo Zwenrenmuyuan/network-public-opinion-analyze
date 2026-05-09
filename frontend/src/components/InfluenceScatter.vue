@@ -4,8 +4,16 @@ import { useECharts } from '@/composables/useECharts'
 import { EMOTION_COLORS, baseDark } from '@/api/echarts-theme'
 import type { InfluenceEmotionPoint } from '@/types/api'
 
-const props = withDefaults(defineProps<{ data: InfluenceEmotionPoint[]; height?: number }>(), {
+const props = withDefaults(defineProps<{
+  data: InfluenceEmotionPoint[]
+  height?: number
+  /** 0-1，画一条水平参考线（如该话题的整体负面率），帮读者判断 KOL 是否高于/低于平均 */
+  referenceY?: number | null
+  referenceLabel?: string
+}>(), {
   height: 480,
+  referenceY: null,
+  referenceLabel: '话题整体负面率',
 })
 
 const chartEl = ref<HTMLElement | null>(null)
@@ -69,6 +77,19 @@ const option = computed(() => ({
         borderWidth: 1,
       },
     })),
+    markLine: props.referenceY == null ? undefined : {
+      silent: true,
+      symbol: 'none',
+      lineStyle: { color: '#f5c34a', type: 'dashed' as const, width: 1.5 },
+      label: {
+        formatter: `${props.referenceLabel} ${(props.referenceY * 100).toFixed(1)}%`,
+        color: '#f5c34a',
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 10,
+        position: 'insideEndTop' as const,
+      },
+      data: [{ yAxis: props.referenceY }],
+    },
   }],
 }))
 

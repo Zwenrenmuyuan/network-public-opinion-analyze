@@ -21,6 +21,7 @@ from .config import (
     TOPIC_DETAIL_ACTOR_DEFAULT_LIMIT,
 )
 from .evidence import evidence_samples
+from .risk import add_risk_raw_values, compute_window_caps, risk_factor_points
 from .utils import format_growth, limit_arg, ratio, resolve_window, risk_level, to_float, to_int, utc_to_cst_iso
 
 
@@ -48,7 +49,8 @@ def topic_detail(ck, window: dict, topic_id: int, evidence_limit: int, actor_lim
     engagement_curve, engagement = _topic_engagement(ck, window, topic_id)
     source_mix, source_counts = _topic_source_mix(ck, window, topic_id)
     actor_signals = _topic_actor_signals(ck, window, topic_id)
-    risk = _topic_risk(emotion, engagement, source_counts, actor_signals)
+    caps = compute_window_caps(ck, window)
+    risk = _topic_risk(emotion, engagement, source_counts, actor_signals, caps)
     actors = actor_summary(ck, window, topic_id, actor_limit)
     evidence = evidence_samples(ck, window, topic_id, evidence_limit)['samples']
 
@@ -289,41 +291,40 @@ def _topic_actor_signals(ck, window: dict, topic_id: int) -> dict:
     }
 
 
-def _topic_risk(emotion: dict, engagement: dict, source_counts: dict[str, int], actor_signals: dict) -> dict:
-    negative_growth = ratio(
-        emotion['recent_negative_count'] - emotion['previous_negative_count'],
-        max(emotion['previous_negative_count'], 1),
-    )
-    source_diversity = ratio(len([name for name in SOURCE_TYPES if source_counts.get(name, 0) > 0]), len(SOURCE_TYPES))
-    kol_verified_raw = (
-        actor_signals['kol_entry_count']
-        + actor_signals['verified_actor_count']
-        + actor_signals['high_follower_actor_count']
-    )
-    factors = {
-        'negative_ratio': 100 * 0.25 * emotion['negative_ratio'],
-        'negative_growth': 100 * 0.20 * min(max(negative_growth, 0.0), 1.0),
-        'interaction_growth': 100 * 0.20 * min(max(engagement['interaction_growth'], 0.0), 1.0),
-        'anger_fear': 100 * 0.15 * emotion['anger_fear_ratio'],
-        'kol_verified': 100 * 0.10 * min(kol_verified_raw / 10, 1.0),
-        'source_diversity': 100 * 0.10 * source_diversity,
+def _topic_risk(emotion: dict, engagement: dict, source_counts: dict[str, int],
+                actor_signals: dict, caps: dict[str, float]) -> dict:
+    """与 risk-topics 列表共用同一公式（窗口候选 p95 归一化），保证列表分 == 详情分。"""
+    item = {
+        'sample_count': emotion['total'],
+        'negative_count': emotion['negative_count'],
+        'recent_negative_count': emotion['recent_negative_count'],
+        'previous_negative_count': emotion['previous_negative_count'],
+        'anger_fear_count': emotion['anger_fear_count'],
+        'earliest_interactions': engagement.get('earliest_interactions', 0.0),
+        'interaction_delta': engagement['interaction_delta'],
+        'source_counts': source_counts,
+        'kol_entry_count': actor_signals['kol_entry_count'],
+        'verified_actor_count': actor_signals['verified_actor_count'],
+        'high_follower_actor_count': actor_signals['high_follower_actor_count'],
     }
-    dominant_emotion = max(emotion['counts'].items(), key=lambda kv: kv[1])[0] if emotion['total'] else '中性'
+    add_risk_raw_values(item)
+    factors = risk_factor_points(item, caps)
     score = round(sum(factors.values()), 1)
+    dominant_emotion = max(emotion['counts'].items(), key=lambda kv: kv[1])[0] if emotion['total'] else '中性'
     return {
         'risk_score': score,
         'risk_level': risk_level(score),
         'dominant_emotion': dominant_emotion,
         'negative_ratio': emotion['negative_ratio'],
-        'negative_growth': round(negative_growth, 4),
-        'negative_growth_label': format_growth(negative_growth),
-        'interaction_growth': engagement['interaction_growth'],
-        'interaction_growth_label': format_growth(engagement['interaction_growth']),
+        'negative_growth': round(item['negative_growth_raw'], 4),
+        'negative_growth_label': format_growth(item['negative_growth_raw']),
+        'interaction_growth': round(item['interaction_growth_ratio'], 4),
+        'interaction_growth_label': format_growth(item['interaction_growth_ratio']),
         'risk_factors': {key: round(value, 1) for key, value in factors.items()},
         'risk_factor_labels': RISK_FACTOR_LABELS,
         'note': (
             f"负面率 {emotion['negative_ratio'] * 100:.1f}%，主导情绪为{dominant_emotion}；"
-            '详情风险分按当前时间窗口内的情绪、互动、账号与入口信号计算。'
+            '风险分采用与风险话题榜一致的公式（窗口候选 p95 归一化）。'
         ),
     }
 

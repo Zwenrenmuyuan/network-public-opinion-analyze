@@ -1,31 +1,63 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMetaStore } from '@/stores/meta'
 import { api } from '@/api/client'
 import RangeTabs from '@/components/RangeTabs.vue'
-import InfluenceScatter from '@/components/InfluenceScatter.vue'
 import ActorList from '@/components/ActorList.vue'
-import { EMOTION_COLORS, EMOTION_ORDER } from '@/api/echarts-theme'
-import type { Actor, InfluenceEmotionPoint, RangeKey } from '@/types/api'
+import type { Actor, RangeKey } from '@/types/api'
 
 const metaStore = useMetaStore()
 const { data: meta, range } = storeToRefs(metaStore)
 
 const actors = ref<Actor[]>([])
-const scatter = ref<InfluenceEmotionPoint[]>([])
 const errorMsg = ref('')
+const selectedRoles = ref<Set<string>>(new Set())
 
-async function loadAll() {
+const ROLE_FILTERS = [
+  { key: 'entry_kol', label: '入口 KOL' },
+  { key: 'verified_actor', label: '认证' },
+  { key: 'high_follower_actor', label: '高粉' },
+  { key: 'high_interaction', label: '高互动' },
+  { key: 'negative_polarized', label: '负面极化' },
+  { key: 'active_voice', label: '活跃发言' },
+  { key: 'cross_topic', label: '跨话题' },
+]
+
+const filteredActors = computed(() => {
+  if (selectedRoles.value.size === 0) return actors.value
+  return actors.value.filter((a) => a.roles.some((r) => selectedRoles.value.has(r)))
+})
+
+const roleCounts = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const r of ROLE_FILTERS) counts[r.key] = 0
+  for (const a of actors.value) {
+    for (const r of a.roles) {
+      if (counts[r] !== undefined) counts[r] += 1
+    }
+  }
+  return counts
+})
+
+function toggleRole(key: string) {
+  const s = new Set(selectedRoles.value)
+  if (s.has(key)) s.delete(key)
+  else s.add(key)
+  selectedRoles.value = s
+}
+
+function clearRoles() {
+  selectedRoles.value = new Set()
+}
+
+async function loadActors() {
   errorMsg.value = ''
-  const [a, s] = await Promise.allSettled([
-    api.actors(range.value, 30),
-    api.influenceEmotion(range.value, 80),
-  ])
-  if (a.status === 'fulfilled') actors.value = a.value
-  if (s.status === 'fulfilled') scatter.value = s.value
-  const failed = [a, s].filter((r) => r.status === 'rejected') as PromiseRejectedResult[]
-  if (failed.length) errorMsg.value = failed.map((f) => String(f.reason)).join(' / ')
+  try {
+    actors.value = await api.actors(range.value, 50)
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+  }
 }
 
 function setRange(v: RangeKey) {
@@ -34,10 +66,10 @@ function setRange(v: RangeKey) {
 
 onMounted(async () => {
   await metaStore.load()
-  await loadAll()
+  await loadActors()
 })
 
-watch(range, () => loadAll())
+watch(range, () => loadActors())
 </script>
 
 <template>
@@ -45,43 +77,42 @@ watch(range, () => loadAll())
     <div class="reveal">
       <p class="page-eyebrow">SECTION III / ACTORS</p>
       <h1 class="page-title">关键<em>账号</em></h1>
-      <p class="page-lead">舆情场域中影响力较高的账号，已做角色化脱敏。点击账号卡懒加载该账号在窗口内的代表样本。</p>
+      <p class="page-lead">
+        多维 OR 评判：账号只要满足"入口 KOL / 认证 / 高粉 / 高互动 / 负面极化 / 活跃 / 跨话题"任一标签即纳入。
+        排序按匹配标签数 DESC。点击账号卡懒加载该账号在窗口内的代表样本。
+      </p>
     </div>
     <div class="page-meta reveal">
       <RangeTabs v-if="meta" :model-value="range" :options="meta.time_range_options" @update:model-value="setRange" />
     </div>
   </section>
 
-  <section class="scatter-section reveal">
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">INFLUENCE × NEGATIVE</p>
-        <h2 class="section-title">影响力 × 负面率<em>scatter</em></h2>
-      </div>
-      <div class="scatter-legend">
-        <span v-for="l in EMOTION_ORDER" :key="l">
-          <i :style="{ background: EMOTION_COLORS[l] }"></i>{{ l }}
-        </span>
-        <span class="muted">尺寸 = 互动量</span>
-      </div>
+  <section class="filter-section reveal">
+    <div class="filter-row">
+      <button
+        class="chip-btn"
+        :class="{ active: selectedRoles.size === 0 }"
+        @click="clearRoles"
+      >
+        全部 <small>{{ actors.length }}</small>
+      </button>
+      <button
+        v-for="r in ROLE_FILTERS" :key="r.key"
+        class="chip-btn"
+        :class="{ active: selectedRoles.has(r.key) }"
+        @click="toggleRole(r.key)"
+      >
+        {{ r.label }} <small>{{ roleCounts[r.key] }}</small>
+      </button>
     </div>
-    <div class="scatter-card">
-      <InfluenceScatter :data="scatter" />
-    </div>
-    <p class="scatter-hint">
-      横轴为账号综合影响力分（互动量 + 粉丝段位 + 认证），纵轴为该账号在窗口内推断样本的负面情绪占比，
-      点的尺寸映射互动量。右上方密集的点意味着影响力高且情绪偏负面，是研判优先关注的账号。
+    <p class="filter-hint">
+      多选 OR：勾选多个标签 = 显示满足任一的账号。当前显示
+      <strong>{{ filteredActors.length }}</strong> / {{ actors.length }} 个。
     </p>
   </section>
 
   <section class="list-section">
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">ACTORS / TOP {{ actors.length }}</p>
-        <h2 class="section-title">账号列表<em>top movers</em></h2>
-      </div>
-    </div>
-    <ActorList :actors="actors" :range="range" />
+    <ActorList :actors="filteredActors" :range="range" />
   </section>
 
   <p v-if="errorMsg" class="error-line">部分接口加载失败：{{ errorMsg }}</p>
@@ -103,8 +134,7 @@ watch(range, () => loadAll())
 .page-title {
   font-family: var(--serif-cn); font-weight: 900;
   font-size: clamp(40px, 5vw, 64px);
-  line-height: 0.96; letter-spacing: -0.04em; color: var(--ink);
-  margin-top: 24px;
+  line-height: 0.96; letter-spacing: -0.04em; color: var(--ink); margin-top: 24px;
 }
 .page-title em {
   font-family: var(--serif); font-style: italic; font-weight: 300;
@@ -112,54 +142,50 @@ watch(range, () => loadAll())
   color: var(--accent);
 }
 .page-lead {
-  margin-top: 22px; max-width: 640px;
+  margin-top: 22px; max-width: 720px;
   color: var(--ink-2); font-size: 14px; line-height: 1.85;
 }
 .page-meta { padding-bottom: 6px; }
 
-.scatter-section {
-  padding: 40px var(--shell-pad-x) 32px;
+.filter-section {
+  padding: 28px var(--shell-pad-x) 12px;
   border-top: 1px solid var(--line);
 }
-.list-section {
-  padding: 40px var(--shell-pad-x) 80px;
-  border-top: 1px solid var(--line);
+.filter-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
 }
-
-.section-head {
-  display: flex; justify-content: space-between; align-items: end;
-  margin-bottom: 28px;
-  flex-wrap: wrap; gap: 16px;
-}
-.section-title {
-  font-family: var(--serif-cn); font-weight: 700;
-  font-size: 28px; letter-spacing: -0.02em; color: var(--ink);
-}
-.section-title em {
-  font-family: var(--serif); font-style: italic; font-weight: 300;
-  color: var(--muted); margin-left: 14px; font-size: 0.55em;
-  letter-spacing: 0.02em; vertical-align: middle;
-}
-
-.scatter-legend {
-  display: flex; gap: 14px; flex-wrap: wrap;
+.chip-btn {
   font-family: var(--mono); font-size: 11px;
-  color: var(--muted);
-}
-.scatter-legend span { display: flex; align-items: center; gap: 6px; }
-.scatter-legend i { width: 8px; height: 8px; border-radius: 50%; }
-.scatter-legend .muted { color: var(--muted-2); }
-
-.scatter-card {
+  letter-spacing: 0.12em;
+  padding: 8px 14px;
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.012);
-  padding: 18px 14px 6px;
-}
-.scatter-hint {
-  margin-top: 14px;
-  font-size: 12px; line-height: 1.8;
+  background: rgba(255,255,255,0.02);
   color: var(--muted);
-  max-width: 720px;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  display: flex; align-items: center; gap: 8px;
+}
+.chip-btn small {
+  font-size: 10px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.chip-btn:hover { color: var(--ink-2); border-color: var(--line-2); }
+.chip-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(245,195,74,0.06);
+}
+.chip-btn.active small { color: var(--accent); }
+
+.filter-hint {
+  margin-top: 14px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); letter-spacing: 0.04em;
+}
+.filter-hint strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.list-section {
+  padding: 24px var(--shell-pad-x) 80px;
 }
 
 .error-line {
