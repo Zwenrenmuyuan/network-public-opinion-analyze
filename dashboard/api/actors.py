@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import math
 from collections import Counter, defaultdict
@@ -301,6 +302,7 @@ def _render_actors(actors: list[dict], limit: int) -> list[dict]:
         interaction_basis = item['interaction_count'] if total_interactions else item['sample_count']
         out.append({
             'actor_id': _actor_hash(item['uid']),
+            'evidence_token': make_actor_evidence_token(item['uid']),
             'display_name': '',
             'verified': item['verified'],
             'verified_type': item['verified_type'],
@@ -347,6 +349,22 @@ def _log_norm(value: int, cap: int) -> float:
 def _actor_hash(uid: int) -> str:
     digest = hashlib.blake2b(str(uid).encode('utf-8'), digest_size=5).hexdigest()
     return f'u_{digest}'
+
+
+def make_actor_evidence_token(uid: int) -> str:
+    """short token 用于 evidence?actor_id= 反查 uid（脱敏 hash 不可逆，故另发 token）。"""
+    return base64.urlsafe_b64encode(str(uid).encode('utf-8')).decode('ascii').rstrip('=')
+
+
+def decode_actor_evidence_token(token: str) -> int | None:
+    if not token:
+        return None
+    pad = '=' * ((-len(token)) % 4)
+    try:
+        raw = base64.urlsafe_b64decode((token + pad).encode('ascii')).decode('utf-8')
+        return int(raw)
+    except (ValueError, UnicodeDecodeError):
+        return None
 
 
 def _followers_bucket(followers_count: int, profile_tier: int) -> str:

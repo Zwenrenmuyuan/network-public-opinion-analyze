@@ -1,0 +1,45 @@
+:root {
+  /* 背景层级 */
+  --bg-0: #07090d;
+  --bg-1: #0d1117;
+  --bg-2: #131820;
+  --bg-3: #1a212c;
+
+  /* 边框 / 描边 */
+  --line: rgba(255, 255, 255, 0.06);
+  --line-2: rgba(255, 255, 255, 0.12);
+
+  /* 文字 */
+  --ink: #f3f4f6;
+  --ink-2: #d1d5db;
+  --muted: #7d8694;
+  --muted-2: #4d5562;
+
+  /* 强调 */
+  --accent: #f5c34a;
+  --accent-2: #f59e0b;
+  --alert: #ff4d52;
+  --positive: #4ade80;
+
+  /* 情绪六色（顺序固定: 0 积极 / 1 愤怒 / 2 悲伤 / 3 恐惧 / 4 惊讶 / 5 中性） */
+  --c-positive: #4ade80;
+  --c-anger: #ff4d52;
+  --c-sad: #4b8aff;
+  --c-fear: #a78bfa;
+  --c-surprise: #ffa028;
+  --c-neutral: #94a3b8;
+
+  /* 字体 */
+  --serif: 'Fraunces', 'Noto Serif SC', serif;
+  --serif-cn: 'Noto Serif SC', serif;
+  --sans-cn: 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* 布局 */
+  --shell-pad-x: 56px;
+  --radius-pill: 999px;
+}
+
+@media (max-width: 1100px) {
+  :root { --shell-pad-x: 32px; }
+}

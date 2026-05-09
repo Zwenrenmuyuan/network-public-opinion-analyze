@@ -7,6 +7,7 @@ import json
 
 from flask import Blueprint, jsonify, request
 
+from .actors import decode_actor_evidence_token
 from .config import ANGER_FEAR_LABEL_IDS, EVIDENCE_DEFAULT_LIMIT, EVIDENCE_MAX_LIMIT, LOW_MARGIN_THRESHOLD, NEGATIVE_LABEL_IDS, PRIMARY_MODEL_VERSION
 from .utils import display_text, limit_arg, q_arg, resolve_window, round_float, to_float, to_int, topic_id_arg, utc_to_cst_iso
 
@@ -14,6 +15,8 @@ from .utils import display_text, limit_arg, q_arg, resolve_window, round_float, 
 def register_evidence_routes(api: Blueprint, ck) -> None:
     @api.route('/evidence')
     def api_evidence():
+        actor_token = request.args.get('actor_id', '').strip()
+        actor_uid = decode_actor_evidence_token(actor_token) if actor_token else None
         return jsonify(evidence_samples(
             ck,
             resolve_window(ck),
@@ -21,11 +24,12 @@ def register_evidence_routes(api: Blueprint, ck) -> None:
             limit_arg('limit', EVIDENCE_DEFAULT_LIMIT, EVIDENCE_MAX_LIMIT),
             q_arg(),
             request.args.get('cursor', '').strip(),
+            actor_uid,
         ))
 
 
 def evidence_samples(ck, window: dict, topic_id: int | None, limit: int,
-                     q: str = '', cursor: str = '') -> dict:
+                     q: str = '', cursor: str = '', actor_uid: int | None = None) -> dict:
     """返回 {samples, next_cursor}。
 
     keyset 分页：cursor 编码上一页最后一行的 (evidence_score, source, source_id)；
@@ -33,10 +37,15 @@ def evidence_samples(ck, window: dict, topic_id: int | None, limit: int,
     的字典序 WHERE 拿下一页。score 相同时 (source, source_id) 做 stable tie-breaker。
     """
     topic_filter = '' if topic_id is None else f'AND pt.topic_id = {topic_id}'
+    actor_filter_post = '' if actor_uid is None else f'AND p.user_id = {actor_uid}'
+    actor_filter_comment = '' if actor_uid is None else f'AND c.user_id = {actor_uid}'
     start = window['start_utc_str']
     end = window['end_utc_str']
     cursor_where = _cursor_where(_decode_cursor(cursor))
-    rows = ck.query_json(_evidence_sql(start, end, topic_filter, q, cursor_where, limit))
+    rows = ck.query_json(_evidence_sql(
+        start, end, topic_filter, q, cursor_where, limit,
+        actor_filter_post, actor_filter_comment,
+    ))
     samples = []
     for idx, row in enumerate(rows, 1):
         reason_parts = [row['pred_label']]
@@ -108,7 +117,8 @@ def _cursor_where(cursor: tuple[float, str, int] | None) -> str:
 
 
 def _evidence_sql(start: str, end: str, topic_filter: str, q: str,
-                  cursor_where: str, limit: int) -> str:
+                  cursor_where: str, limit: int,
+                  actor_filter_post: str = '', actor_filter_comment: str = '') -> str:
     q_filter_post = f"AND positionCaseInsensitive(p.text_raw, '{q}') > 0" if q else ''
     q_filter_comment = f"AND positionCaseInsensitive(c.text_raw, '{q}') > 0" if q else ''
     score_expr = f"""
@@ -170,6 +180,7 @@ def _evidence_sql(start: str, end: str, topic_filter: str, q: str,
           WHERE {where_common}
             AND sp.source_type = 'post'
             {q_filter_post}
+            {actor_filter_post}
           GROUP BY
             sp.source_type, sp.source_id, sp.post_id, sp.source_created_at, p.text_raw,
             sp.pred_label, sp.pred_label_id, sp.confidence, sp.second_label, sp.margin,
@@ -199,6 +210,7 @@ def _evidence_sql(start: str, end: str, topic_filter: str, q: str,
           WHERE {where_common}
             AND sp.source_type = 'comment'
             {q_filter_comment}
+            {actor_filter_comment}
           GROUP BY
             sp.source_type, sp.source_id, sp.post_id, sp.source_created_at, c.text_raw,
             sp.pred_label, sp.pred_label_id, sp.confidence, sp.second_label, sp.margin,
