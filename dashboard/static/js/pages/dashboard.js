@@ -50,6 +50,8 @@ const state = {
   disagreement: null,
   topicQuery: "",
   evidenceQuery: "",
+  evidenceList: [],
+  evidenceNextCursor: "",
 };
 
 // 请求序号防御：切换 range / topic 时分别 +1。异步返回时校对序号，
@@ -666,7 +668,7 @@ function renderEvidence(items) {
     el("#evidenceList").innerHTML = '<p class="muted">暂无证据样本（采样评论，不代表全量分布）</p>';
     return;
   }
-  el("#evidenceList").innerHTML = items.map((item) => {
+  const itemsHTML = items.map((item) => {
     const sourceTag = item.source === "comment" ? "采样评论" : "帖子";
     return `
       <article class="evidence-item">
@@ -682,6 +684,18 @@ function renderEvidence(items) {
       </article>
     `;
   }).join("");
+  const moreBtn = state.evidenceNextCursor
+    ? '<button class="evidence-more" id="evidenceMoreBtn" type="button">加载更多</button>'
+    : '';
+  el("#evidenceList").innerHTML = itemsHTML + moreBtn;
+  const btn = document.getElementById("evidenceMoreBtn");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      btn.disabled = true;
+      btn.textContent = "加载中...";
+      loadEvidence(tokens.topic, { append: true });
+    });
+  }
 }
 
 // ===========================================================================
@@ -932,16 +946,33 @@ async function loadTopicDetail(token) {
   }
 }
 
-async function loadEvidence(token) {
-  el("#evidenceList").innerHTML = '<p class="muted">正在加载证据样本（采样评论）...</p>';
+async function loadEvidence(token, { append = false } = {}) {
+  if (!append) {
+    el("#evidenceList").innerHTML = '<p class="muted">正在加载证据样本（采样评论）...</p>';
+    state.evidenceList = [];
+    state.evidenceNextCursor = "";
+  }
   try {
     const q = state.evidenceQuery ? `&q=${encodeURIComponent(state.evidenceQuery)}` : "";
-    const rows = await fetchJSON(`/api/dashboard/evidence?${withTopic(rangeQS())}&limit=8${q}`);
+    const cur = append && state.evidenceNextCursor
+      ? `&cursor=${encodeURIComponent(state.evidenceNextCursor)}` : "";
+    const data = await fetchJSON(`/api/dashboard/evidence?${withTopic(rangeQS())}&limit=8${q}${cur}`);
     if (token !== tokens.topic) return;
-    renderEvidence(rows);
+    const samples = data.samples || [];
+    state.evidenceList = append ? state.evidenceList.concat(samples) : samples;
+    state.evidenceNextCursor = data.next_cursor || "";
+    renderEvidence(state.evidenceList);
   } catch (err) {
     if (token !== tokens.topic) return;
-    el("#evidenceList").innerHTML = `<p class="muted error">证据样本加载失败：${escapeHTML(err.message)}</p>`;
+    if (!append) {
+      el("#evidenceList").innerHTML = `<p class="muted error">证据样本加载失败：${escapeHTML(err.message)}</p>`;
+    } else {
+      // 追加失败时保留已有列表，仅在末尾加错误提示
+      const errBlock = document.createElement("p");
+      errBlock.className = "muted error";
+      errBlock.textContent = `加载更多失败：${err.message}`;
+      el("#evidenceList").appendChild(errBlock);
+    }
   }
 }
 

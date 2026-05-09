@@ -50,7 +50,7 @@ def topic_detail(ck, window: dict, topic_id: int, evidence_limit: int, actor_lim
     actor_signals = _topic_actor_signals(ck, window, topic_id)
     risk = _topic_risk(emotion, engagement, source_counts, actor_signals)
     actors = actor_summary(ck, window, topic_id, actor_limit)
-    evidence = evidence_samples(ck, window, topic_id, evidence_limit)
+    evidence = evidence_samples(ck, window, topic_id, evidence_limit)['samples']
 
     return {
         'topic': {

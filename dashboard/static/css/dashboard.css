@@ -310,6 +310,21 @@ h3 { margin-bottom: 8px; font-size: 14px; }
 }
 .search-input::placeholder { color: var(--muted); }
 
+.evidence-more {
+  width: 100%;
+  padding: 10px;
+  margin-top: 4px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--brand);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.evidence-more:hover { background: #f1f6ff; border-color: var(--brand); }
+.evidence-more:disabled { color: var(--muted); cursor: not-allowed; }
+
 /* per-class F1（model-card 内业务集 × SMP test 对比） */
 .per-class-box { margin-top: 16px; }
 .per-class-box h3 { font-size: 13px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
