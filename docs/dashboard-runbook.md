@@ -106,7 +106,97 @@ GET /api/dashboard/model-quality
 - 评论相关文案标注“采样评论”。
 - API 单模块失败时页面其他模块不应崩溃。
 
-## 6. 常见排错
+## 6. 生产部署考虑
+
+### 6.1 WSGI 部署
+
+Flask 内置 dev server 不可用于生产（性能、并发、稳定性都不足，启动会打印警告）。
+生产用 gunicorn：
+
+```bash
+uv run gunicorn -w 4 -b 0.0.0.0:8000 dashboard.server:app
+```
+
+worker 数量按 CPU 核心 `2 * cores + 1` 估，全部走 sync worker（dashboard 是 IO-bound，
+但 CK 客户端是同步 httpx，gevent/eventlet 没必要）。Cache 是进程内 dict，多 worker 之间
+不共享——每个 worker 第一次冷请求各走一次 CK，可接受；要全局缓存再换 Redis。
+
+### 6.2 ClickHouse 只读账号
+
+dashboard 后端不应使用导入/写入用账号。生产 CK 上为 dashboard 单独建只读账号：
+
+```sql
+CREATE USER dashboard_ro IDENTIFIED WITH sha256_password BY '<strong-password>';
+GRANT SELECT ON weibo.* TO dashboard_ro;
+GRANT SELECT ON dashboard.* TO dashboard_ro;
+-- 可选：限定单 IP 来源
+ALTER USER dashboard_ro HOST IP '10.0.0.0/24';
+```
+
+`READONLY_USER` / `READONLY_PASSWORD` 在 `.env` 里写这个账号；写权限账号留给离线脚本
+（`init_dashboard_schema.py` / `predict_business_emotions.py`）使用，建议放在另一份
+不被 dashboard 进程读取的 env 文件，调用时 `env $(cat .env.write | xargs) uv run ...`
+或显式 `--user/--password` 参数。
+
+### 6.3 查询超时
+
+后端层（`CKClient(timeout=30.0)`）默认 30 秒，对 dashboard 全部 endpoint 够用。要更紧可在
+`server.py` 显式传 `CKClient(timeout=15.0)`，超时直接抛 `CKNetworkError` → 503。
+
+CK 服务端层防御性配置（`config.xml` 或 `users.xml` 的 profile）：
+
+```xml
+<max_execution_time>20</max_execution_time>
+<max_memory_usage>4000000000</max_memory_usage>     <!-- 4 GiB / query -->
+<max_threads>4</max_threads>
+<max_concurrent_queries_for_user>4</max_concurrent_queries_for_user>
+```
+
+防止前端某个慢查询把 CK 资源吃满。
+
+### 6.4 反代 + HTTPS
+
+生产前面建议 nginx 终结 TLS，反代到 gunicorn：
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name dashboard.example.com;
+    ssl_certificate     /etc/ssl/certs/dashboard.crt;
+    ssl_certificate_key /etc/ssl/private/dashboard.key;
+
+    # 静态文件 nginx 直接服务，跳过 Python
+    location /static/ {
+        alias /opt/dashboard/static/;
+        expires 1d;
+    }
+
+    location / {
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_read_timeout 60s;
+    }
+}
+
+server {
+    listen 80;
+    server_name dashboard.example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+### 6.5 资源限制与监控
+
+- gunicorn `--max-requests 1000 --max-requests-jitter 100` 避免 worker 长时间运行
+  累积内存（cache dict 没有上限）。
+- 关注 CK 端 `system.query_log` 看慢查询，如果 `risk-topics` / `topics/<id>` 频繁慢，
+  说明 cache 没命中，检查前端是否一直带不同参数。
+- 后端 stdout 已经打印 `dashboard_api {path} status=... elapsed_ms=...`，接到日志
+  收集即可看 P95 延迟。
+
+## 7. 常见排错
 
 `.env` 缺少 CK 配置：
 
