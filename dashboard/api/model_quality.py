@@ -45,6 +45,8 @@ def register_model_quality_routes(api: Blueprint, project_root: Path) -> None:
             'checkpoint': PRIMARY_CHECKPOINT,
             'business_eval': extract_eval(business),
             'smp_test': extract_eval(smp_test),
+            'confusion_matrix': matrix,
+            'confusion_labels': cm_labels,
             'top_confusions': top_confusions(matrix, cm_labels, top_n=3),
             'bert_comparison': bert_cmp,
         })

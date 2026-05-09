@@ -151,6 +151,94 @@ export interface EvidenceResponse {
   next_cursor: string | null
 }
 
+export interface DataQualityResponse {
+  comment_sampling_notice: string
+  engagement_notice: string
+  timezone_notice: string
+  history_window_notice: string
+  user_tier_notice: string
+  post_discovery_notice: string
+  profile_tier_distribution: Record<string, number>
+  generated_from: string[]
+}
+
+export interface InfluenceEmotionPoint {
+  actor_id: string
+  display_name: string
+  influence_score: number
+  negative_ratio: number
+  interaction_count: number
+  dominant_emotion: EmotionLabel
+  topic_id: string | null
+  topic_title: string
+  roles: string[]
+}
+
+export interface ModelEvalSlice {
+  samples: number
+  accuracy: number
+  macro_f1: number
+  per_class_f1: Record<EmotionLabel, number>
+}
+
+export interface BertComparison {
+  name: string
+  usage: string
+  agreement_rate: number
+  oracle_accuracy: number
+  bert_accuracy: number
+  bert_macro_f1: number
+  ernie_only_correct: number | null
+  bert_only_correct: number | null
+}
+
+export interface ModelQualityResponse {
+  primary_model: string
+  checkpoint: string
+  business_eval: ModelEvalSlice | null
+  smp_test: ModelEvalSlice | null
+  confusion_matrix: number[][] | null
+  confusion_labels: EmotionLabel[]
+  top_confusions: { true: EmotionLabel; pred: EmotionLabel; count: number }[]
+  bert_comparison: BertComparison | null
+}
+
+export interface DisagreementMatrixCell {
+  ernie_label: EmotionLabel
+  bert_label: EmotionLabel
+  count: number
+}
+
+export interface DisagreementSample {
+  source: 'post' | 'comment'
+  source_id: string
+  post_id: string
+  created_at: string | null
+  content: string
+  ernie_label: EmotionLabel
+  ernie_confidence: number | null
+  ernie_margin: number | null
+  bert_label: EmotionLabel
+  bert_confidence: number | null
+  bert_margin: number | null
+}
+
+export interface ModelDisagreementResponse {
+  primary_model: string
+  primary_model_version: string
+  primary_checkpoint: string
+  secondary_model: string
+  secondary_model_version: string
+  secondary_checkpoint: string
+  secondary_usage: string
+  samples_total: number
+  agreement_count: number
+  agreement_rate: number
+  labels: EmotionLabel[]
+  matrix: DisagreementMatrixCell[]
+  top_disagreements: DisagreementSample[]
+}
+
 export interface TopicDetailResponse {
   topic: TopicMeta
   timeline: EmotionTimeseriesPoint[]

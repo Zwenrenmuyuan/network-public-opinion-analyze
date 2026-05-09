@@ -1,6 +1,7 @@
 import type {
-  EmotionTimeseriesPoint, EvidenceResponse, MetaResponse, OverviewResponse,
-  RangeKey, RiskTopic, TopicDetailResponse,
+  Actor, DataQualityResponse, EmotionTimeseriesPoint, EvidenceResponse, InfluenceEmotionPoint, MetaResponse,
+  ModelDisagreementResponse, ModelQualityResponse,
+  OverviewResponse, RangeKey, RiskTopic, TopicDetailResponse,
 } from '@/types/api'
 
 const BASE = '/api/dashboard'
@@ -27,6 +28,16 @@ export const api = {
     if (opts?.actorLimit) u.set('actor_limit', String(opts.actorLimit))
     return fetchJSON<TopicDetailResponse>(`/topics/${topicId}?${u}`)
   },
+  actors: (range: RangeKey, limit = 30, topicId?: string | null) => {
+    const u = new URLSearchParams({ range, limit: String(limit) })
+    if (topicId) u.set('topic_id', topicId)
+    return fetchJSON<Actor[]>(`/actors?${u}`)
+  },
+  influenceEmotion: (range: RangeKey, limit = 80, topicId?: string | null) => {
+    const u = new URLSearchParams({ range, limit: String(limit) })
+    if (topicId) u.set('topic_id', topicId)
+    return fetchJSON<InfluenceEmotionPoint[]>(`/influence-emotion?${u}`)
+  },
   evidence: (params: { range: RangeKey; topicId?: string | null; q?: string; cursor?: string; limit?: number; actorId?: string }) => {
     const u = new URLSearchParams({ range: params.range })
     if (params.topicId) u.set('topic_id', params.topicId)
@@ -36,4 +47,7 @@ export const api = {
     if (params.actorId) u.set('actor_id', params.actorId)
     return fetchJSON<EvidenceResponse>(`/evidence?${u}`)
   },
+  modelQuality: () => fetchJSON<ModelQualityResponse>('/model-quality'),
+  modelDisagreement: (limit = 12) => fetchJSON<ModelDisagreementResponse>(`/model-disagreement?limit=${limit}`),
+  dataQuality: () => fetchJSON<DataQualityResponse>('/data-quality'),
 }
