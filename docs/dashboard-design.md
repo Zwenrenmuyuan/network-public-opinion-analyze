@@ -15,7 +15,7 @@
 | 详情 API | 已实现 | `topics/{topic_id}`、`actors`、`influence-emotion`、`evidence`。 |
 | 模型质量 API | 已实现 | 读取 `runs/ernie-usual-mixed-v2/*` 和模型分歧摘要。 |
 | 业务集双模型分歧 API | 已实现 | `model-disagreement` 直接读 `dashboard.sentiment_prediction` 算 ERNIE × BERT 一致率、6×6 分歧矩阵和高置信分歧样本。 |
-| 前端 v1 | 已实现 | 单页工作台，含时间范围、话题详情、关键账号、影响力矩阵、双模型分歧。 |
+| 前端 v1 | 已实现 | 总览工作台 `/`：时间范围、话题详情、关键账号、影响力矩阵、双模型分歧；独立数据口径页 `/data-quality`：数据来源表、时间窗口、模型说明、tier 分布。 |
 | 缓存 | 已实现 | `dashboard/api/cache.py` 5 分钟 TTL；`REDIS_URL` 配置时走 Redis 后端（`dashboard:` 前缀 + SETEX），未配置或不可达时降级到进程内 dict；覆盖 overview / emotion-timeseries / risk-topics / topics / actors / influence-emotion / model-quality / model-disagreement。 |
 | 搜索/分页/反馈 | 未实现 | 属于 Phase 5 后端增强。 |
 
@@ -315,7 +315,7 @@ KOL 分三类解释：
 
 ## 9. 前端 v1
 
-当前前端是单页，不是多页面应用。
+前端以总览页为单页工作台 `/`，并独立挂出 `/data-quality` 详情页解释数据口径。
 
 已实现区域：
 
@@ -383,9 +383,8 @@ GET /api/dashboard/evidence?range=all_available&topic_id={topic_id}&limit=3
 
 优先级中：
 
-- 关键词搜索。
-- 证据样本大规模分页。
-- 独立数据口径页。
+- 关键词搜索（接口已实现于 `evidence` / `risk-topics`，可继续做更细粒度，如多关键字、ngram 索引）。
+- 证据样本大规模分页（接口已支持 cursor，可继续做"上一页"或"跳页"）。
 - 传播溯源增强：首次发现入口、入口随时间变化、多入口扩散路径。
 
 优先级低：

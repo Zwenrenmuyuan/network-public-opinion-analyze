@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>数据口径 / 社交媒体舆情智能研判平台</title>
+    <link rel="stylesheet" href="./static/css/dashboard.css" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero panel">
+        <div class="hero-main">
+          <p class="eyebrow">Data scope · 数据口径详情</p>
+          <h1>数据口径 / 时间窗口 / 模型版本</h1>
+          <p class="subtitle">用于解释总览页所有数字的边界与限制</p>
+          <a class="back-link" href="/">← 返回总览页</a>
+        </div>
+        <div class="hero-meta" aria-label="数据快照信息">
+          <span id="dataWindowSpan">加载中...</span>
+          <span id="modelSpan">加载中...</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="panel scope-section">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">数据来源</p>
+              <h2>各层来源与口径限制</h2>
+            </div>
+          </div>
+          <table class="scope-table">
+            <thead>
+              <tr><th>数据层</th><th>表</th><th>用途</th><th>口径限制</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>内容层</td>
+                <td><code>weibo.post</code> / <code>weibo.comment</code></td>
+                <td>原文、证据流、预测输入</td>
+                <td>评论是采样集合，不代表全量评论分布</td>
+              </tr>
+              <tr>
+                <td>情绪层</td>
+                <td><code>dashboard.sentiment_prediction</code></td>
+                <td>六分类预测、置信度、BERT 对照</td>
+                <td>查询必须按 model_version 过滤</td>
+              </tr>
+              <tr>
+                <td>热度层</td>
+                <td><code>weibo.post_engagement_ts</code></td>
+                <td>点赞 / 评论 / 转发快照</td>
+                <td>快照稀疏，不是连续时间序列</td>
+              </tr>
+              <tr>
+                <td>话题层</td>
+                <td><code>weibo.topic</code> / <code>weibo.post_topic</code></td>
+                <td>话题聚合、详情页</td>
+                <td>仅代表显式携带话题的帖子</td>
+              </tr>
+              <tr>
+                <td>传播层</td>
+                <td><code>weibo.post_discovery</code></td>
+                <td>hot / keyword / kol / retweet 入口</td>
+                <td>一帖可多入口，不能 <code>count(*)</code> 当帖子数</td>
+              </tr>
+              <tr>
+                <td>账号层</td>
+                <td><code>weibo.user</code></td>
+                <td>认证、画像 tier、KOL 解释</td>
+                <td><code>followers_count</code> 仅 <code>profile_tier ≥ 1</code> 可信</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="panel scope-section">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">时间窗口</p>
+              <h2>数据快照时间口径</h2>
+            </div>
+          </div>
+          <p class="muted">起点按 <code>first_crawled_at</code> 阈值（每天 ≥ 10000 行）确定稳定爬虫日；展示统一按东八区，CK 内部按 UTC 存储。</p>
+          <div class="kv-grid" id="windowMeta">
+            <div><span>稳定起点</span><strong>—</strong></div>
+          </div>
+        </section>
+
+        <section class="panel scope-section">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">标签与模型</p>
+              <h2>六分类 taxonomy</h2>
+            </div>
+            <span class="pill muted" id="modelPill">主模型版本：—</span>
+          </div>
+          <p>主模型 checkpoint：<code id="modelCkpt">—</code></p>
+          <div class="legend" id="emotionLegend"></div>
+          <p class="muted" style="margin-top:10px">
+            标签顺序对应 <code>src/npo/config.py:LABELS_ZH</code> 与模型 logits 索引；
+            负面情绪定义为 <strong>愤怒 + 悲伤 + 恐惧</strong>，用于 <code>negative_ratio</code> 与 <code>risk_index</code> 计算。
+          </p>
+        </section>
+
+        <section class="panel scope-section">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">采样与覆盖</p>
+              <h2>窗口内采样与画像分布</h2>
+            </div>
+          </div>
+          <ul id="dataQualityList"><li class="muted">加载中...</li></ul>
+          <h3 style="margin-top:18px">用户画像 tier 分布</h3>
+          <div id="tierChart" class="echart" style="width:100%; height:300px;" role="img" aria-label="用户画像 tier 分布饼图"></div>
+        </section>
+
+        <section class="panel scope-section">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">使用提醒</p>
+              <h2>解读注意事项</h2>
+            </div>
+          </div>
+          <ul class="scope-warnings">
+            <li>评论数据为采样集合，不代表平台全量评论分布。</li>
+            <li>互动数来自 <code>post_engagement_ts</code> 平台快照，不是实时计数。</li>
+            <li><code>profile_tier = 0</code> 用户画像字段（粉丝数等）不可信，仅 tier ≥ 1 可用作排序信号。</li>
+            <li>风险分（<code>risk_score</code>）服务于排序与解释，不是绝对真值。</li>
+            <li>BERT 对照仅作模型解释 / 困难样本发现，不是主展示模型；分歧样本见<a href="/">总览页 → 双模型分歧分析</a>。</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="./static/js/pages/data-quality.js" defer></script>
+  </body>
+</html>

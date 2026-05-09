@@ -37,6 +37,11 @@ def index():
     return send_from_directory(DASHBOARD_DIR, 'index.html')
 
 
+@app.route('/data-quality')
+def data_quality_page():
+    return send_from_directory(DASHBOARD_DIR, 'data-quality.html')
+
+
 @app.route('/static/<path:filename>')
 def static_files(filename: str):
     return send_from_directory(DASHBOARD_DIR / 'static', filename)
