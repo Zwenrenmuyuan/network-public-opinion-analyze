@@ -75,7 +75,19 @@ def _evidence_sql(start: str, end: str, topic_filter: str, limit: int) -> str:
       {topic_filter}
     """
     return f"""
-        SELECT *
+        SELECT
+          source,
+          source_id,
+          post_id,
+          topic_id,
+          created_at_utc,
+          content,
+          pred_label,
+          confidence,
+          second_label,
+          margin,
+          actor_role,
+          interaction_count
         FROM (
           SELECT
             sp.source_type AS source,
