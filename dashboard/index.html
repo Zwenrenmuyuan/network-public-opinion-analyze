@@ -5,19 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>社交媒体舆情智能研判平台</title>
     <link rel="stylesheet" href="./static/css/dashboard.css" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
   </head>
   <body>
     <div class="shell">
       <header class="hero panel">
-        <div>
-          <p class="eyebrow">Demo 数据 / 数据快照</p>
+        <div class="hero-main">
+          <p class="eyebrow">舆情研判 · 同源 API · 采样视图</p>
           <h1>社交媒体舆情智能研判平台</h1>
           <p class="subtitle">面向话题风险、情绪结构和证据样本的可解释研判工作台</p>
+          <div class="range-tabs" id="rangeTabs" role="tablist" aria-label="时间范围切换"></div>
         </div>
         <div class="hero-meta" aria-label="数据快照信息">
           <span id="dataWindowSpan">加载中...</span>
           <span id="modelSpan">加载中...</span>
-          <strong class="risk-badge" id="riskBadge">数据快照</strong>
+          <strong class="risk-badge" id="riskBadge">实时聚合</strong>
         </div>
       </header>
 
@@ -34,7 +36,7 @@
               <div class="legend" id="emotionLegend"></div>
             </div>
             <div class="chart-wrap">
-              <svg id="trendChart" viewBox="0 0 760 300" role="img" aria-label="情绪趋势堆叠面积图"></svg>
+              <div id="trendChart" class="echart trend-chart" role="img" aria-label="情绪趋势堆叠面积图"></div>
             </div>
           </article>
 
@@ -61,14 +63,43 @@
           </article>
         </section>
 
+        <section class="panel topic-detail-card" id="topicDetailCard" aria-label="话题详情">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">话题详情 · 评论为采样评论</p>
+              <h2 id="detailTitle">请选择风险话题</h2>
+              <p class="subtitle muted" id="detailLead"></p>
+            </div>
+            <div class="detail-meta" id="detailMeta"></div>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-block">
+              <h3>情绪结构（采样）</h3>
+              <div id="detailEmotionChart" class="echart detail-chart"></div>
+            </div>
+            <div class="detail-block">
+              <h3>情绪趋势（采样）</h3>
+              <div id="detailTimelineChart" class="echart detail-chart"></div>
+            </div>
+            <div class="detail-block">
+              <h3>互动曲线（平台快照）</h3>
+              <div id="detailEngagementChart" class="echart detail-chart"></div>
+            </div>
+            <div class="detail-block">
+              <h3>入口结构</h3>
+              <div id="detailSourceChart" class="echart detail-chart"></div>
+            </div>
+          </div>
+        </section>
+
         <section class="lower-grid">
           <article class="panel evidence-card">
             <div class="section-head compact">
               <div>
-                <p class="eyebrow">Representative evidence</p>
+                <p class="eyebrow">Representative evidence · 采样评论</p>
                 <h2>代表性样本 / 证据流</h2>
               </div>
-              <span class="pill muted" id="evidenceFilter">全部话题</span>
+              <span class="pill muted" id="evidenceFilter">全部话题（采样评论）</span>
             </div>
             <div class="evidence-list" id="evidenceList"></div>
           </article>
@@ -105,9 +136,35 @@
             </ul>
           </aside>
         </section>
+
+        <section class="actor-grid">
+          <article class="panel actor-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Key actors · 角色化（采样）</p>
+                <h2>关键账号 / KOL</h2>
+              </div>
+              <span class="pill muted" id="actorScope">全部话题（采样）</span>
+            </div>
+            <div class="actor-list" id="actorList">
+              <p class="muted">加载中...</p>
+            </div>
+          </article>
+
+          <article class="panel influence-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Influence × Emotion · 采样口径</p>
+                <h2>影响力-情绪矩阵</h2>
+              </div>
+              <span class="pill muted">x 影响力 · y 负面率 · 大小=互动</span>
+            </div>
+            <div id="influenceChart" class="echart influence-chart" role="img" aria-label="影响力-情绪散点图"></div>
+          </article>
+        </section>
       </main>
     </div>
 
-    <script src="./static/js/pages/dashboard.js"></script>
+    <script src="./static/js/pages/dashboard.js" defer></script>
   </body>
 </html>

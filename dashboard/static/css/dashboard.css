@@ -44,6 +44,35 @@ body {
   position: relative;
 }
 
+.hero-main { flex: 1 1 auto; min-width: 0; }
+
+.range-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.range-tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.range-tab:hover { border-color: #b9c9ef; transform: translateY(-1px); }
+.range-tab.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(47, 95, 208, 0.25);
+}
+.range-tab[disabled] { opacity: 0.55; cursor: not-allowed; }
+
 .hero::after {
   content: "";
   position: absolute;
@@ -121,7 +150,10 @@ h3 { margin-bottom: 8px; font-size: 14px; }
 .legend i, .emotion-tag i { width: 9px; height: 9px; border-radius: 999px; }
 
 .chart-wrap { width: 100%; overflow-x: auto; }
-#trendChart { min-width: 640px; width: 100%; height: auto; }
+.echart { width: 100%; }
+.trend-chart { min-height: 320px; height: 320px; }
+.detail-chart { min-height: 240px; height: 240px; }
+.influence-chart { min-height: 380px; height: 380px; }
 .axis { stroke: #d8dee8; stroke-width: 1; }
 .grid-line { stroke: #edf1f6; stroke-width: 1; }
 .chart-label { fill: #667085; font-size: 12px; }
@@ -162,6 +194,104 @@ h3 { margin-bottom: 8px; font-size: 14px; }
 .confusion-box, .compare-box { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
 .scope-card ul { margin: 0; padding-left: 18px; }
 .scope-card li + li { margin-top: 8px; }
+.muted.error { color: var(--angry); }
+
+/* topic detail */
+.topic-detail-card {
+  margin-top: 16px;
+  padding: 22px;
+}
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 520px;
+  justify-content: flex-end;
+}
+.detail-meta strong { color: var(--ink); margin-left: 4px; }
+.detail-meta span.muted { color: var(--muted); }
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.detail-block {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 14px 6px;
+  background: linear-gradient(180deg, #fff, #fbfcff);
+}
+.detail-block h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* actor / influence */
+.actor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+.actor-card, .influence-card { padding: 22px; }
+.actor-list {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.actor-row {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+.actor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.actor-head strong { font-weight: 700; }
+.actor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.actor-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: var(--brand);
+  border: 1px solid #d9e5ff;
+}
+.role-chip.verified { background: #fff3e8; color: #b6580c; border-color: #ffd7b3; }
+
+@media (max-width: 1120px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .actor-grid { grid-template-columns: 1fr; }
+  .detail-meta { justify-content: flex-start; max-width: none; }
+}
 
 @media (max-width: 1120px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
