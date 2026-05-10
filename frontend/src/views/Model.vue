@@ -219,7 +219,10 @@ onMounted(async () => {
   font-size: 10px;
 }
 
-section[class$="-section"] {
+.metrics-section,
+.per-class-section,
+.confusion-section,
+.disagreement-section {
   padding: 40px var(--shell-pad-x);
   border-top: 1px solid var(--line);
 }

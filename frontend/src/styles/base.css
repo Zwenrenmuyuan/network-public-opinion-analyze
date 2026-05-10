@@ -54,6 +54,27 @@ input, select, textarea { font: inherit; color: inherit; }
 
 ::selection { background: rgba(245, 195, 74, 0.3); color: var(--ink); }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.42) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track { background: transparent; }
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.36);
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(148, 163, 184, 0.52); }
+
 .eyebrow {
   font-family: var(--mono);
   font-size: 10px;

@@ -240,7 +240,11 @@ onMounted(async () => {
 .meta-line strong { color: var(--ink); font-weight: 500; }
 .meta-line code { color: var(--accent); background: rgba(245,195,74,0.08); padding: 2px 6px; font-size: 10px; }
 
-section[class$="-section"] {
+.window-section,
+.sources-section,
+.labels-section,
+.tier-section,
+.notices-section {
   padding: 40px var(--shell-pad-x);
   border-top: 1px solid var(--line);
 }
