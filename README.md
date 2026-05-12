@@ -74,6 +74,57 @@ npm install
 
 ## 数据与标签
 
+本项目的基础公开数据集是 **SMP2020 微博情绪分类评测（SMP2020-EWECT）**，用于中文微博短文本六分类情绪识别。
+
+官方入口与下载信息：
+
+| 项 | 内容 |
+|---|---|
+| 评测主页 | [SMP2020微博情绪分类评测 SMP2020-EWECT](https://smp2020ewect.github.io/) |
+| 下载链接 | [百度网盘](https://pan.baidu.com/s/1JeKK1dNlKFzbk_TXuOdCVw) |
+| 百度网盘分享密码 | `isp0` |
+| zip 解压密码 | `smp2020ewect` |
+| 项目默认 zip 路径 | `data/评测数据集加密.zip` |
+| 项目默认解压目录 | `data/raw/` |
+
+注意：百度网盘分享密码只用于获取压缩包；`scripts/extract_dataset.py` 使用的是 zip 解压密码，默认已经设为 `smp2020ewect`。原始压缩包、解压后的原始数据和处理后的 parquet 都属于数据文件，默认不提交到 Git。
+
+SMP2020-EWECT 在本项目中按官方两个 track 处理：
+
+| track | 说明 | 当前用途 |
+|---|---|---|
+| `usual` | 通用微博情绪分类数据。 | 当前主训练和 Dashboard 主模型使用的基础 track。 |
+| `virus` | 疫情相关微博情绪分类数据。 | 保留训练、评估和对比能力。 |
+
+每个 track 都按 `train`、`eval`、`test` 三个 split 构建标准训练数据：
+
+| split | 原始目录 | 项目用途 |
+|---|---|---|
+| `train` | `评测数据集/train/` | 训练集。 |
+| `eval` | `评测数据集/eval（刷榜数据集）/` | 验证集，用于 early stopping 和 best checkpoint 选择。 |
+| `test` | `评测数据集/test（最终评测集）/真实评测集/` | 最终测试集，只用于最终评估。 |
+
+官方包里还包含 `test（最终评测集）/含混淆数据/`。这部分在项目中只用于 `scripts/explore_dataset.py` 做数据探索，不进入 `scripts/preprocess.py` 的训练/评估 parquet 构建流程。
+
+原始 `.txt` 文件是 UTF-8 JSON 文本，记录字段主要包括：
+
+| 字段 | 说明 |
+|---|---|
+| `id` | 官方样本编号。 |
+| `content` | 原始微博文本。 |
+| `label` | 英文情绪标签。 |
+
+原始英文标签在预处理阶段统一转成中文标签：
+
+| 原始标签 | 中文标签 |
+|---|---|
+| `happy` | 积极 |
+| `angry` | 愤怒 |
+| `sad` | 悲伤 |
+| `fear` | 恐惧 |
+| `surprise` | 惊讶 |
+| `neutral` | 中性 |
+
 标准 parquet schema：
 
 | 列 | 说明 |
@@ -97,10 +148,33 @@ npm install
 
 ## SMP 数据处理
 
+先从官方网盘下载 `评测数据集加密.zip`，放到项目的 `data/` 目录下：
+
+```text
+data/评测数据集加密.zip
+```
+
 解压官方加密包：
 
 ```bash
 uv run python scripts/extract_dataset.py
+```
+
+解压脚本默认输出到 `data/raw/`，并处理官方 zip 中中文文件名编码标志缺失导致的乱码问题。解压后的关键文件由 `scripts/dataset_paths.py` 统一维护：
+
+| 数据 | 原始文件 |
+|---|---|
+| `usual_train` | `data/raw/评测数据集/train/usual_train.txt` |
+| `usual_eval` | `data/raw/评测数据集/eval（刷榜数据集）/usual_eval_labeled.txt` |
+| `usual_test` | `data/raw/评测数据集/test（最终评测集）/真实评测集/usual_test_labeled.txt` |
+| `virus_train` | `data/raw/评测数据集/train/virus_train.txt` |
+| `virus_eval` | `data/raw/评测数据集/eval（刷榜数据集）/virus_eval_labeled.txt` |
+| `virus_test` | `data/raw/评测数据集/test（最终评测集）/真实评测集/virus_test_labeled.txt` |
+
+如果 zip 不在默认位置，或需要输出到其他目录，可以显式传参：
+
+```bash
+uv run python scripts/extract_dataset.py --zip <zip-path> --dest <raw-out> --password smp2020ewect
 ```
 
 探索数据，不产生副作用：
@@ -109,10 +183,23 @@ uv run python scripts/extract_dataset.py
 uv run python scripts/explore_dataset.py
 ```
 
+探索脚本会读取 train/eval/真实 test 以及含混淆测试数据，输出样本数、标签分布、文本长度分位数、重复样本、train 与 eval/test 内容重叠、URL/@/话题/转发/微博表情等文本特征占比。若已经生成 `data/processed/`，还会补充清洗后文本长度统计，用于校验训练时的 `max_length`。
+
 构建基础 parquet：
 
 ```bash
 uv run python scripts/preprocess.py
+```
+
+默认写出 6 个标准 parquet：
+
+```text
+data/processed/usual_train.parquet
+data/processed/usual_eval.parquet
+data/processed/usual_test.parquet
+data/processed/virus_train.parquet
+data/processed/virus_eval.parquet
+data/processed/virus_test.parquet
 ```
 
 自定义输入输出路径：
@@ -121,7 +208,9 @@ uv run python scripts/preprocess.py
 uv run python scripts/preprocess.py --raw-root <raw-root> --out-root <out-root>
 ```
 
-清洗规则由 `scripts/preprocess.py:clean_text` 维护：NFKC 归一化、繁转简、英文小写、去 URL、去转发链、去 @、话题去 `#` 保留文本、折叠空白，并保留 `[心]` 等微博表情。
+预处理阶段会做：丢弃空标签/空文本、文本清洗、英文标签转中文标签、生成 `label_id`、文件内部按 `content` 去重、从 train 中删除与 eval/test 内容完全相同的样本以防评估泄露。
+
+清洗规则由 `scripts/preprocess.py:clean_text` 维护：NFKC 归一化、繁转简、英文小写、去 URL、去转发链、去 @、话题去 `#` 保留文本、折叠空白，并保留 `[心]` 等微博表情。预处理只做 512 字符的异常文本上限保护；训练时真正的 tokenizer `max_length` 由 `src/npo/config.py` 控制，当前默认是 `usual=128`、`virus=192`。
 
 ## 训练与评估
 
