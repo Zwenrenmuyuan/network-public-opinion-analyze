@@ -17,6 +17,10 @@ dashboard 后端从仓库根目录 `.env` 或进程环境读取 ClickHouse 配�
 可选变量：
 
 - `REDIS_URL`：API 缓存后端，例如 `redis://localhost:16379/0` 或 `redis://:<password>@<host>:<port>/<db>`；未设或连接失败时自动降级到进程内 dict（多 worker 不共享）。
+- `LLM_BASE_URL` / `LLM_API_KEY`：OpenAI-compatible LLM 服务，用于 AI 辅助研判总结。
+- `DASHBOARD_LLM_ENABLED`：`0/false/no/off` 时关闭 AI 研判接口。
+- `DASHBOARD_LLM_MODEL`：Dashboard 总结模型，默认 `mimo-v2.5-pro`；未设时回退 `LLM_MODEL`。
+- `DASHBOARD_LLM_TIMEOUT` / `DASHBOARD_LLM_MAX_TOKENS`：Dashboard 总结超时和输出上限；思考模型建议 `8192` 起。
 
 运行原则：
 
@@ -99,6 +103,8 @@ GET /api/dashboard/topics/{topic_id}?range=all_available&limit=3&actor_limit=3
 GET /api/dashboard/actors?range=all_available&limit=3
 GET /api/dashboard/influence-emotion?range=all_available&limit=3
 GET /api/dashboard/evidence?range=all_available&topic_id={topic_id}&limit=3
+GET /api/dashboard/insights?range=all_available
+GET /api/dashboard/insights?range=all_available&topic_id={topic_id}
 GET /api/dashboard/model-quality
 ```
 

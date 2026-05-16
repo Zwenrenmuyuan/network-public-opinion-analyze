@@ -13,6 +13,7 @@ import TopicSourceMix from '@/components/TopicSourceMix.vue'
 import ActorList from '@/components/ActorList.vue'
 import EvidenceList from '@/components/EvidenceList.vue'
 import InfluenceScatter from '@/components/InfluenceScatter.vue'
+import AiInsightCard from '@/components/AiInsightCard.vue'
 import { EMOTION_COLORS, EMOTION_ORDER } from '@/api/echarts-theme'
 import { formatLargeNumber } from '@/utils/format'
 import type { InfluenceEmotionPoint, RangeKey, RiskTopic, TopicDetailResponse } from '@/types/api'
@@ -169,6 +170,8 @@ watch(selectedId, (id) => { if (id) loadDetail(id) })
             <div><span>KOL 入口</span><strong>{{ detail.topic.kol_entry_count }}</strong></div>
           </div>
         </div>
+
+        <AiInsightCard :range="range" :topic-id="selectedId" title="AI 话题研判" />
 
         <div class="risk-bars-block reveal">
           <h3 class="block-title"><span class="eyebrow">RISK / FACTORS</span>风险因子拆解</h3>

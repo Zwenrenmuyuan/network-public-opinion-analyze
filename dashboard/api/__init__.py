@@ -13,6 +13,7 @@ from ck import CKError, CKNetworkError
 from .actors import register_actor_routes
 from .disagreement import register_disagreement_routes
 from .evidence import register_evidence_routes
+from .insights import register_insight_routes
 from .model_quality import register_model_quality_routes
 from .risk import register_risk_routes
 from .summary import register_summary_routes
@@ -61,6 +62,7 @@ def create_dashboard_api(ck, project_root: Path) -> Blueprint:
     register_topic_routes(api, ck)
     register_actor_routes(api, ck)
     register_evidence_routes(api, ck)
+    register_insight_routes(api, ck)
     register_model_quality_routes(api, project_root)
     register_disagreement_routes(api, ck)
 

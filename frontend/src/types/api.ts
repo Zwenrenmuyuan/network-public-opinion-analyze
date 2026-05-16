@@ -151,6 +151,19 @@ export interface EvidenceResponse {
   next_cursor: string | null
 }
 
+export interface InsightResponse {
+  scope: 'overview' | 'topic'
+  generated_at: string
+  llm_model: string
+  summary: string
+  key_findings: string[]
+  risk_drivers: string[]
+  actor_insights: string[]
+  evidence_refs: string[]
+  caveats: string[]
+  recommended_actions: string[]
+}
+
 export interface DataQualityResponse {
   comment_sampling_notice: string
   engagement_notice: string

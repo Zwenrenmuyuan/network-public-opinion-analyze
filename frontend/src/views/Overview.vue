@@ -8,6 +8,7 @@ import KpiRow from '@/components/KpiRow.vue'
 import EmotionTrendChart from '@/components/EmotionTrendChart.vue'
 import EmotionDonut from '@/components/EmotionDonut.vue'
 import RiskTopicList from '@/components/RiskTopicList.vue'
+import AiInsightCard from '@/components/AiInsightCard.vue'
 import type { OverviewResponse, EmotionTimeseriesPoint, RiskTopic, RangeKey } from '@/types/api'
 
 const metaStore = useMetaStore()
@@ -47,6 +48,7 @@ watch(range, () => { loadAll() })
 <template>
   <HeroBanner :meta="meta" :overview="overview" :range="range" @update:range="setRange" />
   <KpiRow :overview="overview" :timeseries="timeseries" />
+  <AiInsightCard :range="range" />
 
   <section class="trend-section">
     <div class="section-head">

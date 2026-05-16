@@ -1,5 +1,5 @@
 import type {
-  Actor, DataQualityResponse, EmotionTimeseriesPoint, EvidenceResponse, InfluenceEmotionPoint, MetaResponse,
+  Actor, DataQualityResponse, EmotionTimeseriesPoint, EvidenceResponse, InfluenceEmotionPoint, InsightResponse, MetaResponse,
   ModelDisagreementResponse, ModelQualityResponse,
   OverviewResponse, RangeKey, RiskTopic, TopicDetailResponse,
 } from '@/types/api'
@@ -8,7 +8,16 @@ const BASE = '/api/dashboard'
 
 async function fetchJSON<T>(path: string): Promise<T> {
   const r = await fetch(BASE + path)
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${path}`)
+  if (!r.ok) {
+    let message = `HTTP ${r.status}: ${path}`
+    try {
+      const body = await r.json()
+      if (body?.error?.message) message = body.error.message
+    } catch {
+      // keep the generic HTTP message
+    }
+    throw new Error(message)
+  }
   return r.json() as Promise<T>
 }
 
@@ -46,6 +55,11 @@ export const api = {
     if (params.limit) u.set('limit', String(params.limit))
     if (params.actorId) u.set('actor_id', params.actorId)
     return fetchJSON<EvidenceResponse>(`/evidence?${u}`)
+  },
+  insights: (range: RangeKey, topicId?: string | null) => {
+    const u = new URLSearchParams({ range })
+    if (topicId) u.set('topic_id', topicId)
+    return fetchJSON<InsightResponse>(`/insights?${u}`)
   },
   modelQuality: () => fetchJSON<ModelQualityResponse>('/model-quality'),
   modelDisagreement: (limit = 12) => fetchJSON<ModelDisagreementResponse>(`/model-disagreement?limit=${limit}`),

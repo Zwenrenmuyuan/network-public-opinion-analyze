@@ -16,7 +16,8 @@
 | 模型质量 API | 已实现 | 读取 `runs/ernie-usual-mixed-v2/*` 和模型分歧摘要。 |
 | 业务集双模型分歧 API | 已实现 | `model-disagreement` 直接读 `dashboard.sentiment_prediction` 算 ERNIE × BERT 一致率、6×6 分歧矩阵和高置信分歧样本。 |
 | 前端 v1 | 已实现 | 总览工作台 `/`：时间范围、话题详情、关键账号、影响力矩阵、双模型分歧；独立数据口径页 `/data-quality`：数据来源表、时间窗口、模型说明、tier 分布。 |
-| 缓存 | 已实现 | `dashboard/api/cache.py` 5 分钟 TTL；`REDIS_URL` 配置时走 Redis 后端（`dashboard:` 前缀 + SETEX），未配置或不可达时降级到进程内 dict；覆盖 overview / emotion-timeseries / risk-topics / topics / actors / influence-emotion / model-quality / model-disagreement。 |
+| LLM 辅助研判 | 已实现 | `insights` 基于已有聚合指标和 Top N 证据样本生成总览/话题总结；LLM 不直连 CK、不重新判情绪、不修改风险分。 |
+| 缓存 | 已实现 | `dashboard/api/cache.py` 5 分钟默认 TTL；`REDIS_URL` 配置时走 Redis 后端（`dashboard:` 前缀 + SETEX），未配置或不可达时降级到进程内 dict；覆盖 overview / emotion-timeseries / risk-topics / topics / actors / influence-emotion / insights / model-quality / model-disagreement。 |
 | 搜索/分页/反馈 | 未实现 | 属于 Phase 5 后端增强。 |
 
 当前 v1 已完成核心分析闭环，但还不是完整生产后台。生产化仍需要缓存、权限、查询超时、分页搜索和反馈闭环。
@@ -164,6 +165,7 @@ source_type + source_id + model_version
 | `GET /actors` | `range`, `topic_id`, `limit` | 关键账号/KOL 列表 | 已实现 |
 | `GET /influence-emotion` | `range`, `topic_id`, `limit` | 影响力-情绪散点图 | 已实现 |
 | `GET /evidence` | `range`, `topic_id`, `limit` | 代表性证据样本 | 已实现 |
+| `GET /insights` | `range`, `topic_id` | LLM 辅助生成总览或话题研判总结 | 已实现 |
 | `GET /model-quality` | 无 | ERNIE/BERT 指标、混淆、分歧摘要 | 已实现 |
 | `GET /model-disagreement` | `limit` | 业务集 ERNIE × BERT 一致率、6×6 分歧矩阵、Top N 高置信分歧样本 | 已实现 |
 
