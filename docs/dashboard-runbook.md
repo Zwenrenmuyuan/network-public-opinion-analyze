@@ -16,11 +16,14 @@ dashboard 后端从仓库根目录 `.env` 或进程环境读取 ClickHouse 配�
 
 可选变量：
 
-- `REDIS_URL`：API 缓存后端，例如 `redis://localhost:16379/0` 或 `redis://:<password>@<host>:<port>/<db>`；未设或连接失败时自动降级到进程内 dict（多 worker 不共享）。
-- `LLM_BASE_URL` / `LLM_API_KEY`：OpenAI-compatible LLM 服务，用于 AI 辅助研判总结。
+- `REDIS_URL`：API 缓存和 QA 会话后端，例如 `redis://localhost:16379/0` 或 `redis://:<password>@<host>:<port>/<db>`；普通缓存未设或连接失败时自动降级到进程内 dict（多 worker 不共享），QA 会话不降级，Redis 不可用则 QA 功能不可用。
+- `LLM_BASE_URL` / `LLM_API_KEY`：OpenAI-compatible LLM 服务，用于 AI 辅助研判总结和多轮 QA。
 - `DASHBOARD_LLM_ENABLED`：`0/false/no/off` 时关闭 AI 研判接口。
 - `DASHBOARD_LLM_MODEL`：Dashboard 总结模型，默认 `mimo-v2.5-pro`；未设时回退 `LLM_MODEL`。
 - `DASHBOARD_LLM_TIMEOUT` / `DASHBOARD_LLM_MAX_TOKENS`：Dashboard 总结超时和输出上限；思考模型建议 `8192` 起。
+- `DASHBOARD_QA_SESSION_TTL_SECONDS`：QA 会话 Redis TTL，默认 604800 秒（7 天）。
+- `DASHBOARD_QA_CONTEXT_PAIRS`：每轮 prompt 使用的最近问答轮数，默认 10。
+- `DASHBOARD_QA_MAX_MESSAGES`：单会话 Redis 消息保留上限，默认 200。
 
 运行原则：
 
@@ -88,7 +91,7 @@ http://localhost:8000/
 
 ```bash
 uv run python -m py_compile dashboard/server.py dashboard/api/*.py dashboard/ck.py
-node --check dashboard/static/js/pages/dashboard.js
+npm run build  # 在 frontend/ 下执行
 ```
 
 接口 smoke：
@@ -105,6 +108,9 @@ GET /api/dashboard/influence-emotion?range=all_available&limit=3
 GET /api/dashboard/evidence?range=all_available&topic_id={topic_id}&limit=3
 GET /api/dashboard/insights?range=all_available
 GET /api/dashboard/insights?range=all_available&topic_id={topic_id}
+POST /api/dashboard/qa
+GET /api/dashboard/qa/sessions
+GET /api/dashboard/qa/sessions/{session_id}
 GET /api/dashboard/model-quality
 ```
 
@@ -131,7 +137,8 @@ worker 数量按 CPU 核心 `2 * cores + 1` 估，全部走 sync worker（dashbo
 但 CK 客户端是同步 httpx，gevent/eventlet 没必要）。
 
 缓存后端按 `.env` 的 `REDIS_URL` 决定：配了就用 Redis，多 worker 之间共享同一份缓存命中，
-单点失效；没配或 Redis 不可达时降级到进程内 dict，多 worker 间不共享但不影响功能。
+单点失效；没配或 Redis 不可达时降级到进程内 dict，多 worker 间不共享但不影响普通功能。
+QA 会话强依赖 Redis，不使用进程内 fallback；Redis 不可用时 `/api/dashboard/qa*` 返回 `503 qa_store_unavailable`。
 启动行会打印 `cache=redis @ host:port` 或 `cache=in-memory`，看一眼就知道生效的是哪一种。
 
 ### 6.2 ClickHouse 只读账号
@@ -237,6 +244,11 @@ ClickHouse 连接失败：
 
 图表没有渲染：
 
-- 检查浏览器是否能加载 ECharts CDN。
+- 检查 `frontend/dist/` 是否已由 `npm run build` 生成。
 - 检查 `/api/dashboard/*` 是否返回 JSON。
-- 检查 `dashboard/static/js/pages/dashboard.js` 是否通过 `node --check`。
+- 开发模式下检查 Vite dev server 和 `/api` 代理是否正常。
+
+QA 会话不可用：
+
+- `/api/dashboard/qa*` 返回 `qa_store_unavailable` 时，检查 `REDIS_URL` 是否配置且 Redis 可连。
+- 普通 dashboard cache 可能已经 fallback 到 in-memory，但 QA 不会 fallback。

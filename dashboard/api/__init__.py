@@ -15,6 +15,7 @@ from .disagreement import register_disagreement_routes
 from .evidence import register_evidence_routes
 from .insights import register_insight_routes
 from .model_quality import register_model_quality_routes
+from .qa import register_qa_routes
 from .risk import register_risk_routes
 from .summary import register_summary_routes
 from .topics import register_topic_routes
@@ -63,6 +64,7 @@ def create_dashboard_api(ck, project_root: Path) -> Blueprint:
     register_actor_routes(api, ck)
     register_evidence_routes(api, ck)
     register_insight_routes(api, ck)
+    register_qa_routes(api, ck, project_root)
     register_model_quality_routes(api, project_root)
     register_disagreement_routes(api, ck)
 

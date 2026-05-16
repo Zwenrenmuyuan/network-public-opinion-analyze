@@ -48,10 +48,9 @@ def get_data_window(ck) -> dict:
     }
 
 
-def resolve_window(ck) -> dict:
-    """根据 query 参数解析展示窗口；默认 all_available。"""
+def window_for_range(ck, range_key: str = 'all_available') -> dict:
+    """根据 range key 解析展示窗口；默认 all_available。"""
     base = get_data_window(ck)
-    range_key = request.args.get('range', 'all_available')
     end_cst = base['end_cst']
     if range_key == '24h':
         start_cst = max(base['start_cst'], end_cst - timedelta(hours=24))
@@ -70,6 +69,11 @@ def resolve_window(ck) -> dict:
         'start_utc_str': start_cst.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
         'end_utc_str': end_cst.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
     }
+
+
+def resolve_window(ck) -> dict:
+    """根据 query 参数解析展示窗口；默认 all_available。"""
+    return window_for_range(ck, request.args.get('range', 'all_available'))
 
 
 def limit_arg(name: str, default: int, maximum: int) -> int:

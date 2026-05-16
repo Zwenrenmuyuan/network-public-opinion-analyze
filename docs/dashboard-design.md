@@ -16,8 +16,8 @@
 | 模型质量 API | 已实现 | 读取 `runs/ernie-usual-mixed-v2/*` 和模型分歧摘要。 |
 | 业务集双模型分歧 API | 已实现 | `model-disagreement` 直接读 `dashboard.sentiment_prediction` 算 ERNIE × BERT 一致率、6×6 分歧矩阵和高置信分歧样本。 |
 | 前端 v1 | 已实现 | 总览工作台 `/`：时间范围、话题详情、关键账号、影响力矩阵、双模型分歧；独立数据口径页 `/data-quality`：数据来源表、时间窗口、模型说明、tier 分布。 |
-| LLM 辅助研判 | 已实现 | `insights` 基于已有聚合指标和 Top N 证据样本生成总览/话题总结；LLM 不直连 CK、不重新判情绪、不修改风险分。 |
-| 缓存 | 已实现 | `dashboard/api/cache.py` 5 分钟默认 TTL；`REDIS_URL` 配置时走 Redis 后端（`dashboard:` 前缀 + SETEX），未配置或不可达时降级到进程内 dict；覆盖 overview / emotion-timeseries / risk-topics / topics / actors / influence-emotion / insights / model-quality / model-disagreement。 |
+| LLM 辅助研判 | 已实现 | `insights` 生成总览/话题总结；`qa` 是多轮受控 Agent，只能调用 Dashboard 只读工具。LLM 不直连 CK、不重新判情绪、不修改风险分。 |
+| 缓存/会话 | 已实现 | `dashboard/api/cache.py` 5 分钟默认 TTL；普通缓存可 Redis 或进程内降级。QA 会话由 `qa_store.py` 强依赖 Redis，默认 7 天滚动保留，不做进程内降级。 |
 | 搜索/分页/反馈 | 未实现 | 属于 Phase 5 后端增强。 |
 
 当前 v1 已完成核心分析闭环，但还不是完整生产后台。生产化仍需要缓存、权限、查询超时、分页搜索和反馈闭环。
@@ -73,6 +73,11 @@ ClickHouse weibo.* 原始表
 | `dashboard/api/topics.py` | 话题详情。 |
 | `dashboard/api/actors.py` | 关键账号和影响力-情绪矩阵。 |
 | `dashboard/api/evidence.py` | 代表性证据样本。 |
+| `dashboard/api/llm_client.py` | OpenAI-compatible LLM 客户端。 |
+| `dashboard/api/insights.py` | AI 辅助研判总结。 |
+| `dashboard/api/qa.py` | 多轮 QA Agent 路由、planner/answerer 和会话更新。 |
+| `dashboard/api/qa_store.py` | Redis-only QA 会话存储，默认 7 天 TTL。 |
+| `dashboard/api/qa_tools.py` | QA Agent 可调用的只读 Dashboard 工具白名单。 |
 | `dashboard/api/model_quality.py` | 模型质量与 BERT 对照摘要。 |
 | `dashboard/api/disagreement.py` | 业务集 ERNIE × BERT 全量对照（一致率、分歧矩阵、高置信分歧样本）。 |
 | `dashboard/index.html` | 单页工作台结构。 |
@@ -166,6 +171,9 @@ source_type + source_id + model_version
 | `GET /influence-emotion` | `range`, `topic_id`, `limit` | 影响力-情绪散点图 | 已实现 |
 | `GET /evidence` | `range`, `topic_id`, `limit` | 代表性证据样本 | 已实现 |
 | `GET /insights` | `range`, `topic_id` | LLM 辅助生成总览或话题研判总结 | 已实现 |
+| `POST /qa` | JSON: `session_id`, `range`, `topic_id`, `question` | 多轮受控 QA Agent 提问 | 已实现 |
+| `GET /qa/sessions` | `limit` | Redis 中 7 天内 QA 会话列表 | 已实现 |
+| `GET /qa/sessions/{session_id}` | 无 | QA 会话消息历史 | 已实现 |
 | `GET /model-quality` | 无 | ERNIE/BERT 指标、混淆、分歧摘要 | 已实现 |
 | `GET /model-disagreement` | `limit` | 业务集 ERNIE × BERT 一致率、6×6 分歧矩阵、Top N 高置信分歧样本 | 已实现 |
 
@@ -259,6 +267,16 @@ source_type + source_id + model_version
 
 评论证据必须标注为“采集评论”。
 
+### 7.7 `insights` 与 `qa`
+
+LLM 只作为研判解读层：
+
+- 不直连 ClickHouse，不生成 SQL，不读写文件，不访问外部网页。
+- 不重新判定情绪，不修改风险分，不编造输入 JSON 之外的数字。
+- `insights` 由后端预组装固定上下文，适合一键总结。
+- `qa` 是多轮受控 Agent：planner 只能从 `overview`、`risk_topics`、`topic_detail`、`actors`、`evidence`、`emotion_timeseries`、`model_quality`、`model_disagreement`、`data_quality` 中选择最多 3 个工具。
+- QA 会话历史保存在 Redis，默认 TTL 为 7 天；Redis 不可用时 QA 接口返回 `503 qa_store_unavailable`。
+
 ## 8. 派生指标
 
 ### 8.1 互动指标
@@ -339,6 +357,8 @@ KOL 分三类解释：
 - 影响力-情绪矩阵。
 - 模型解释小面板。
 - 数据口径提示。
+- AI 辅助研判总结。
+- 多轮 QA Agent，会话历史默认保留 7 天。
 
 前端约束：
 
@@ -362,7 +382,7 @@ KOL 分三类解释：
 
 ```bash
 uv run python -m py_compile dashboard/server.py dashboard/api/*.py dashboard/ck.py
-node --check dashboard/static/js/pages/dashboard.js
+npm run build  # 在 frontend/ 下执行
 ```
 
 接口 smoke 覆盖：
@@ -377,6 +397,9 @@ GET /api/dashboard/topics/{topic_id}?range=all_available&limit=3&actor_limit=3
 GET /api/dashboard/actors?range=all_available&limit=3
 GET /api/dashboard/influence-emotion?range=all_available&limit=3
 GET /api/dashboard/evidence?range=all_available&topic_id={topic_id}&limit=3
+GET /api/dashboard/insights?range=all_available
+POST /api/dashboard/qa
+GET /api/dashboard/qa/sessions
 ```
 
 人工验收：

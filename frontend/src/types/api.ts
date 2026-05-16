@@ -164,6 +164,59 @@ export interface InsightResponse {
   recommended_actions: string[]
 }
 
+export interface QaMessageMetadata {
+  key_points: string[]
+  evidence_refs: string[]
+  used_tools: string[]
+  caveats: string[]
+  suggested_next_questions: string[]
+  llm_model: string
+}
+
+export interface QaMessage {
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+  metadata: QaMessageMetadata
+}
+
+export interface QaSession {
+  session_id: string
+  scope: 'overview' | 'topic'
+  range: RangeKey
+  topic_id: string | null
+  title: string
+  created_at: string
+  updated_at: string
+  last_model: string
+  message_count: number
+}
+
+export interface QaSessionsResponse {
+  sessions: QaSession[]
+  ttl_seconds: number
+}
+
+export interface QaSessionDetailResponse {
+  session: QaSession
+  messages: QaMessage[]
+  ttl_seconds: number
+}
+
+export interface QaResponse {
+  session_id: string
+  scope: 'overview' | 'topic'
+  question: string
+  answer: string
+  key_points: string[]
+  evidence_refs: string[]
+  used_tools: string[]
+  caveats: string[]
+  suggested_next_questions: string[]
+  generated_at: string
+  llm_model: string
+}
+
 export interface DataQualityResponse {
   comment_sampling_notice: string
   engagement_notice: string

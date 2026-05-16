@@ -1,13 +1,26 @@
 import type {
   Actor, DataQualityResponse, EmotionTimeseriesPoint, EvidenceResponse, InfluenceEmotionPoint, InsightResponse, MetaResponse,
   ModelDisagreementResponse, ModelQualityResponse,
-  OverviewResponse, RangeKey, RiskTopic, TopicDetailResponse,
+  OverviewResponse, QaResponse, QaSessionDetailResponse, QaSessionsResponse, RangeKey, RiskTopic, TopicDetailResponse,
 } from '@/types/api'
 
 const BASE = '/api/dashboard'
 
 async function fetchJSON<T>(path: string): Promise<T> {
   const r = await fetch(BASE + path)
+  return parseJSONResponse<T>(r, path)
+}
+
+async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return parseJSONResponse<T>(r, path)
+}
+
+async function parseJSONResponse<T>(r: Response, path: string): Promise<T> {
   if (!r.ok) {
     let message = `HTTP ${r.status}: ${path}`
     try {
@@ -61,6 +74,15 @@ export const api = {
     if (topicId) u.set('topic_id', topicId)
     return fetchJSON<InsightResponse>(`/insights?${u}`)
   },
+  qaSessions: (limit = 20) => fetchJSON<QaSessionsResponse>(`/qa/sessions?limit=${limit}`),
+  qaSession: (sessionId: string) => fetchJSON<QaSessionDetailResponse>(`/qa/sessions/${sessionId}`),
+  askQa: (params: { sessionId?: string | null; range: RangeKey; topicId?: string | null; question: string }) =>
+    postJSON<QaResponse>('/qa', {
+      session_id: params.sessionId || undefined,
+      range: params.range,
+      topic_id: params.topicId ?? null,
+      question: params.question,
+    }),
   modelQuality: () => fetchJSON<ModelQualityResponse>('/model-quality'),
   modelDisagreement: (limit = 12) => fetchJSON<ModelDisagreementResponse>(`/model-disagreement?limit=${limit}`),
   dataQuality: () => fetchJSON<DataQualityResponse>('/data-quality'),
