@@ -12,6 +12,7 @@
 - 业务 ClickHouse 数据离线情绪预测，结果写入 `dashboard.sentiment_prediction`。
 - Flask 同源 API 聚合 `/api/dashboard/*`，Vue 3 + ECharts 前端展示舆情工作台。
 - 模型质量、数据口径、风险话题、关键账号、证据样本和双模型分歧分析。
+- AI 辅助研判总结和多轮受控 QA Agent：只基于 Dashboard 聚合指标、证据样本和只读工具结果解释，不直连 CK、不生成 SQL、不改情绪/风险分。
 
 当前 Dashboard 主模型：
 
@@ -30,6 +31,8 @@
 - Python 3.12，依赖使用 `uv` 管理。
 - 前端使用 Vue 3 + TypeScript + Vite。
 - Dashboard 后端读取根目录 `.env` 中的 ClickHouse 连接配置。
+- AI 研判和 QA 使用 OpenAI-compatible LLM；`LLM_API_KEY` 可留空，取决于服务是否要求鉴权。
+- Dashboard 普通缓存可 Redis 或进程内 fallback；多轮 QA 会话强依赖 Redis，不可用时 `/api/dashboard/qa*` 返回 `503 qa_store_unavailable`。
 
 安装 Python 依赖：
 
@@ -69,6 +72,9 @@ npm install
 | `scripts/preprocess.py` | SMP 清洗、去重、去泄露和 parquet 输出。 |
 | `scripts/train.py` | 训练入口，使用项目自写 `Trainer`。 |
 | `dashboard/api/config.py` | Dashboard 主/对照模型版本和数据口径常量。 |
+| `dashboard/api/llm_client.py` | Dashboard LLM 客户端，兼容 OpenAI `/chat/completions`。 |
+| `dashboard/api/insights.py` | AI 辅助研判总结接口。 |
+| `dashboard/api/qa.py` / `qa_tools.py` / `qa_store.py` | 多轮受控 QA Agent、只读工具白名单和 Redis 会话存储。 |
 | `docs/dashboard-design.md` | Dashboard API 契约和指标定义。 |
 | `docs/dashboard-runbook.md` | Dashboard 数据准备、启动和验证流程。 |
 
@@ -300,6 +306,8 @@ uv run python scripts/dashboard/predict_business_emotions.py
 
 Dashboard 查询默认过滤 `model_version = 'ernie-usual-mixed-v2'`。BERT 只在模型质量和分歧分析接口中使用。
 
+AI 研判和 QA 不参与模型推理或数据改写，只作为解释层消费后端已聚合的数据。QA Agent 的 planner 最多选择 3 个只读工具，工具白名单由 `dashboard/api/qa_tools.py` 维护；会话保存在 Redis，默认 7 天滚动 TTL。
+
 ## 启动 Dashboard
 
 启动后端：
@@ -307,6 +315,19 @@ Dashboard 查询默认过滤 `model_version = 'ernie-usual-mixed-v2'`。BERT 只
 ```bash
 uv run python dashboard/server.py --port 8000
 ```
+
+`.env` 至少需要 ClickHouse 只读连接；启用 AI 研判/QA 时还需要：
+
+```env
+LLM_BASE_URL=https://your-openai-compatible-host/v1
+LLM_API_KEY=your-optional-api-key
+DASHBOARD_LLM_MODEL=mimo-v2.5-pro
+DASHBOARD_LLM_TIMEOUT=300
+DASHBOARD_LLM_MAX_TOKENS=8192
+REDIS_URL=redis://localhost:16379/0
+```
+
+QA 会话相关默认值见 `.env.example`：`DASHBOARD_QA_SESSION_TTL_SECONDS=604800`、`DASHBOARD_QA_CONTEXT_PAIRS=10`、`DASHBOARD_QA_MAX_MESSAGES=200`。
 
 前端开发模式：
 
@@ -339,6 +360,10 @@ npm run build
 | `GET /actors?range=...` | 关键账号。 |
 | `GET /influence-emotion?range=...` | 影响力-情绪矩阵。 |
 | `GET /evidence?range=...` | 代表性证据样本。 |
+| `GET /insights?range=...` | AI 辅助生成总览或话题研判总结。 |
+| `POST /qa` | 多轮受控 QA Agent 提问。 |
+| `GET /qa/sessions` | Redis 中 7 天内 QA 会话列表。 |
+| `GET /qa/sessions/{session_id}` | QA 会话消息历史。 |
 | `GET /model-quality` | 主模型指标和 BERT 对照摘要。 |
 | `GET /model-disagreement` | ERNIE × BERT 业务集分歧。 |
 
@@ -376,5 +401,6 @@ Dashboard smoke 可参考 `docs/dashboard-runbook.md` 中的接口列表。
 - `frontend/node_modules/`
 - `frontend/dist/`
 - checkpoint、模型权重和业务文本导出
+- `results/model_disagreement/*_details.csv`
 
 `legacy/model_training/` 是迁移参考代码，不是当前训练主线；当前主线使用 `src/npo/` 和 `scripts/`。

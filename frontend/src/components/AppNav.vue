@@ -24,7 +24,9 @@ const time = computed(() => {
 <template>
   <nav class="nav reveal">
     <RouterLink to="/" class="brand">
-      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-mark" aria-hidden="true">
+        <img src="/favicon.svg" alt="" />
+      </div>
       <div class="brand-text">
         NPO · NETWORK PUBLIC OPINION
         <strong>舆情研判驾驶舱</strong>
@@ -57,16 +59,17 @@ const time = computed(() => {
 }
 .brand { display: flex; align-items: center; gap: 14px; cursor: pointer; }
 .brand-mark {
-  width: 38px; height: 38px;
+  width: 42px; height: 42px;
   border: 1px solid var(--line-2);
   border-radius: 50%;
   position: relative; display: grid; place-items: center;
   flex: 0 0 auto;
+  background: rgba(255,255,255,0.025);
 }
-.brand-mark::before {
-  content: ''; width: 6px; height: 6px;
-  background: var(--accent); border-radius: 50%;
-  box-shadow: 0 0 16px var(--accent);
+.brand-mark img {
+  width: 34px;
+  height: 34px;
+  display: block;
 }
 .brand-mark::after {
   content: ''; position: absolute; inset: -6px;
